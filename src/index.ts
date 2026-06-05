@@ -41,14 +41,58 @@ export interface Stakeholder extends Person {
   reasons: string[];
 }
 
+export interface ResearchPlan {
+  researchQuestions: string[];
+  searchQueries: string[];
+  roleHypotheses: string[];
+  evidenceNeeded: string[];
+}
+
+export interface ResearchSource {
+  title: string;
+  url: string;
+  relevance: string;
+}
+
+export interface ResearchReport {
+  companySignals: string[];
+  productFitSignals: string[];
+  competitorSignals: string[];
+  stakeholderSignals: Array<{
+    personId?: PersonId;
+    roleOrTeam: string;
+    signal: string;
+    sourceUrls: string[];
+  }>;
+  recommendedAngles: string[];
+  sources: ResearchSource[];
+}
+
+export interface OutreachDraft {
+  personId: PersonId;
+  name: string;
+  subject: string;
+  email: string;
+  rationale: string;
+}
+
+export interface AgentTraceStep {
+  step: string;
+  why: string;
+  outputSummary: string;
+}
+
 export interface StakeholderAgentResult {
   productContext: ProductContext;
-  agentMode: "gpt";
+  agentMode: "research-agent";
   model: string;
+  researchPlan: ResearchPlan;
+  researchReport: ResearchReport;
   primaryBuyers: Stakeholder[];
   influencers: Stakeholder[];
   executiveApprovers: Stakeholder[];
   pathToDecisionMaker: Stakeholder[];
+  outreachDrafts: OutreachDraft[];
   summary: string;
   reasoning: {
     scoringPriorities: string[];
@@ -56,6 +100,7 @@ export interface StakeholderAgentResult {
     influencerCriteria: string;
     executiveApproverCriteria: string;
   };
+  trace: AgentTraceStep[];
 }
 
 export interface StakeholderAgentOptions {
@@ -88,22 +133,27 @@ interface CliArgs {
   options: StakeholderAgentOptions;
 }
 
+interface OpenAICallInput {
+  options: StakeholderAgentOptions;
+  task: string;
+  payload: unknown;
+  systemPrompt?: string;
+  useWebSearch?: boolean;
+  maxOutputTokens?: number;
+}
+
 const DEFAULT_GPT_MODEL = "gpt-5-nano";
 
 const STAKEHOLDER_AGENT_SYSTEM_PROMPT = [
   "You are the Stakeholder Agent in a GTM Agent Broker.",
-  "Your job is to analyze an org chart and product context, then identify the target account's likely buying committee.",
-  "You must traverse the reporting structure, score people by relevance, classify stakeholders, and return structured JSON only.",
-  "Use GTM judgment, not fixed keyword rules.",
+  "Work like a human GTM researcher: form hypotheses, research the account, map evidence to roles, then decide who to contact.",
+  "Return only valid JSON. Do not wrap JSON in markdown.",
   "Every selected stakeholder must come from the provided org chart.",
   "Keep each selected stakeholder's id, name, title, department, level, and reportsTo exactly as provided.",
   "Scores must be integers from 0 to 100.",
   "Each selected stakeholder must include 1-2 non-empty reasons under 16 words each.",
-  "Keep the JSON compact: 3-5 primary buyers, 3-6 influencers, 2-4 executive approvers.",
-  "The reasoning object must contain non-empty scoringPriorities, primaryBuyerCriteria, influencerCriteria, and executiveApproverCriteria.",
-  "pathToDecisionMaker must include every manager in the reportsTo chain from the strongest primary buyer up to the final executive.",
   "For productCategory = frontend hosting/deployment, prioritize platform engineering, web infrastructure, developer experience, frontend infrastructure, hosting, deployment, site reliability, engineering tooling, and cloud infrastructure.",
-  "Return only valid JSON. Do not wrap the result in markdown."
+  "If research evidence conflicts with the org chart, use the org chart for identity and reporting structure, and research for account-specific rationale."
 ].join(" ");
 
 export function loadOrgChart(input: LoadableOrgChart = "example.json"): OrgChart {
@@ -168,20 +218,70 @@ export async function scorePerson(
   });
 }
 
-export async function classifyStakeholders(
+export async function planResearch(
   orgChart: OrgChart,
   context: ProductContext,
   options: StakeholderAgentOptions = {}
+): Promise<ResearchPlan> {
+  const normalized = normalizeOrgChart(orgChart);
+  const people = flattenOrgTree(normalized);
+  const plan = await callOpenAIJson<Partial<ResearchPlan>>({
+    options,
+    task: "Create a concise account research plan before choosing stakeholders.",
+    payload: {
+      productContext: context,
+      orgChartSummary: summarizeOrgForPrompt(people),
+      instructions:
+        "Return researchQuestions, searchQueries, roleHypotheses, and evidenceNeeded. Include queries about target company engineering priorities, web/frontend/developer platform initiatives, infrastructure strategy, and competitor context."
+    },
+    maxOutputTokens: 1800
+  });
+
+  return sanitizeResearchPlan(plan, context);
+}
+
+export async function conductCompanyResearch(
+  orgChart: OrgChart,
+  context: ProductContext,
+  researchPlan: ResearchPlan,
+  options: StakeholderAgentOptions = {}
+): Promise<ResearchReport> {
+  const normalized = normalizeOrgChart(orgChart);
+  const people = flattenOrgTree(normalized);
+  const report = await callOpenAIJson<Partial<ResearchReport>>({
+    options,
+    task: "Research the account like a human sales researcher, then summarize evidence for stakeholder selection.",
+    payload: {
+      productContext: context,
+      researchPlan,
+      orgChartPeople: summarizeOrgForPrompt(people),
+      instructions:
+        "Use web research to find public evidence about the target company's engineering priorities, product launches, frontend/web properties, developer platform needs, infrastructure strategy, reliability concerns, and competitor context. Return non-empty companySignals, productFitSignals, competitorSignals, stakeholderSignals, recommendedAngles, and sources. Each stakeholderSignal must include a non-empty roleOrTeam, signal, and sourceUrls. Include URLs in sources and sourceUrls."
+    },
+    useWebSearch: true,
+    maxOutputTokens: 5000
+  });
+
+  return sanitizeResearchReport(report);
+}
+
+export async function classifyStakeholders(
+  orgChart: OrgChart,
+  context: ProductContext,
+  options: StakeholderAgentOptions = {},
+  researchReport?: ResearchReport
 ): Promise<StakeholderAgentResult> {
   const normalized = normalizeOrgChart(orgChart);
   const model = options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_GPT_MODEL;
   const people = flattenOrgTree(normalized);
-
+  const effectiveResearchReport =
+    researchReport ?? (await conductCompanyResearch(normalized, context, await planResearch(normalized, context, options), options));
   const result = await callOpenAIJson<Partial<StakeholderAgentResult>>({
     options: { ...options, model },
-    task: "Classify the full stakeholder buying committee from this org chart.",
+    task: "Use the research report and org chart to select the stakeholder buying committee.",
     payload: {
       productContext: context,
+      researchReport: effectiveResearchReport,
       orgChart: {
         rootId: normalized.rootId,
         people,
@@ -193,12 +293,38 @@ export async function classifyStakeholders(
         "influencers must contain 3-6 people who validate technical fit, migration risk, developer experience, and incumbent replacement concerns. " +
         "executiveApprovers must contain 2-4 senior leaders likely to approve budget, strategic platform risk, security, legal, or procurement. " +
         "pathToDecisionMaker must be a valid reportsTo chain from the strongest primary buyer upward. " +
-        "Each stakeholder must include id, name, title, department, level, reportsTo, score, matchedKeywords, and reasons. " +
+        "Each stakeholder must include id, name, title, department, level, reportsTo, score, matchedKeywords, and reasons. Reasons should reference research evidence when possible. " +
         "Do not include schema examples, outputContract, stakeholderShape, or any extra top-level fields."
-    }
+    },
+    maxOutputTokens: 5000
   });
 
-  return sanitizeStakeholderAgentResult(result, context, model, normalized);
+  const placeholderPlan = sanitizeResearchPlan({}, context);
+  return sanitizeStakeholderAgentResult(result, context, model, normalized, placeholderPlan, effectiveResearchReport, []);
+}
+
+export async function draftOutreach(
+  stakeholders: Stakeholder[],
+  context: ProductContext,
+  researchReport: ResearchReport,
+  options: StakeholderAgentOptions = {}
+): Promise<OutreachDraft[]> {
+  const drafts = await callOpenAIJson<unknown>({
+    systemPrompt:
+      "You are a concise enterprise sales researcher. Return only valid JSON with first-touch outreach drafts. Do not wrap JSON in markdown.",
+    options,
+    task: "Draft concise first-touch outreach emails for the selected stakeholders.",
+    payload: {
+      productContext: context,
+      stakeholders: stakeholders.slice(0, 3),
+      researchReport,
+      instructions:
+        "Return exactly one top-level field named outreachDrafts. Draft one email body for each provided stakeholder. Each draft must include the exact personId, exact name, subject, email, and rationale. The email field must be the message body, not an email address. Do not invent recipient email addresses, private facts, or personal details. Keep emails short, specific, and grounded in the research report."
+    },
+    maxOutputTokens: 3500
+  });
+
+  return sanitizeOutreachDrafts(extractOutreachDraftArray(drafts), stakeholders);
 }
 
 export function getPathToRoot(personId: PersonId, orgChart: OrgChart): Person[] {
@@ -232,14 +358,50 @@ export async function runStakeholderAgent(input: {
   options?: StakeholderAgentOptions;
 }): Promise<StakeholderAgentResult> {
   const orgChart = loadOrgChart(input.orgChart ?? "example.json");
-  return classifyStakeholders(orgChart, input.productContext, input.options);
+  const model = input.options?.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_GPT_MODEL;
+  const trace: AgentTraceStep[] = [];
+
+  const researchPlan = await planResearch(orgChart, input.productContext, input.options);
+  trace.push({
+    step: "planResearch",
+    why: "A human seller starts by deciding what evidence would change the contact strategy.",
+    outputSummary: `${researchPlan.searchQueries.length} search queries and ${researchPlan.roleHypotheses.length} role hypotheses.`
+  });
+
+  const researchReport = await conductCompanyResearch(orgChart, input.productContext, researchPlan, input.options);
+  trace.push({
+    step: "conductCompanyResearch",
+    why: "Public account evidence grounds the buying committee in current priorities, not just titles.",
+    outputSummary: `${researchReport.sources.length} sources and ${researchReport.recommendedAngles.length} recommended angles.`
+  });
+
+  const classified = await classifyStakeholders(orgChart, input.productContext, input.options, researchReport);
+  trace.push({
+    step: "classifyStakeholders",
+    why: "The agent maps researched account signals back to the org chart and management paths.",
+    outputSummary: `${classified.primaryBuyers.length} primary buyers, ${classified.influencers.length} influencers, ${classified.executiveApprovers.length} approvers.`
+  });
+
+  const outreachDrafts = await draftOutreach(classified.primaryBuyers, input.productContext, researchReport, input.options);
+  trace.push({
+    step: "draftOutreach",
+    why: "A human researcher turns the stakeholder decision into a concrete next action.",
+    outputSummary: `${outreachDrafts.length} first-touch email drafts.`
+  });
+
+  return {
+    ...classified,
+    productContext: input.productContext,
+    agentMode: "research-agent",
+    model,
+    researchPlan,
+    researchReport,
+    outreachDrafts,
+    trace
+  };
 }
 
-async function callOpenAIJson<T>(input: {
-  options: StakeholderAgentOptions;
-  task: string;
-  payload: unknown;
-}): Promise<T> {
+async function callOpenAIJson<T>(input: OpenAICallInput): Promise<T> {
   const apiKey = input.options.apiKey ?? getEnvValue("OPENAI_API_KEY");
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required. Add it to .env or export it in your shell.");
@@ -248,11 +410,11 @@ async function callOpenAIJson<T>(input: {
   const model = input.options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_GPT_MODEL;
   const requestBody: Record<string, unknown> = {
     model,
-    max_output_tokens: 6000,
+    max_output_tokens: input.maxOutputTokens ?? 6000,
     input: [
       {
         role: "system",
-        content: STAKEHOLDER_AGENT_SYSTEM_PROMPT
+        content: input.systemPrompt ?? STAKEHOLDER_AGENT_SYSTEM_PROMPT
       },
       {
         role: "user",
@@ -264,8 +426,14 @@ async function callOpenAIJson<T>(input: {
     ]
   };
 
+  if (input.useWebSearch) {
+    requestBody.tools = [{ type: "web_search" }];
+    requestBody.tool_choice = "auto";
+    requestBody.include = ["web_search_call.action.sources"];
+  }
+
   if (model.startsWith("gpt-5")) {
-    requestBody.reasoning = { effort: "minimal" };
+    requestBody.reasoning = { effort: input.useWebSearch ? "low" : "minimal" };
     requestBody.text = { verbosity: "low" };
   }
 
@@ -322,11 +490,18 @@ function findRootId(people: Person[]): PersonId | undefined {
   return people.find((person) => person.reportsTo === null)?.id;
 }
 
+function summarizeOrgForPrompt(people: Person[]): Person[] {
+  return people.filter((person) => person.level <= 4);
+}
+
 function sanitizeStakeholderAgentResult(
   result: Partial<StakeholderAgentResult>,
   context: ProductContext,
   model: string,
-  orgChart: OrgChart
+  orgChart: OrgChart,
+  researchPlan: ResearchPlan,
+  researchReport: ResearchReport,
+  outreachDrafts: OutreachDraft[]
 ): StakeholderAgentResult {
   result = unwrapStakeholderAgentResult(result);
   const normalized = normalizeOrgChart(orgChart);
@@ -341,6 +516,12 @@ function sanitizeStakeholderAgentResult(
 
   for (const stakeholder of returnedStakeholders) {
     if (!stakeholder?.id) {
+      continue;
+    }
+
+    const existing = scoreById.get(stakeholder.id);
+    const nextScore = clampScore(stakeholder.score ?? 0);
+    if (existing && existing.score > nextScore) {
       continue;
     }
 
@@ -364,19 +545,23 @@ function sanitizeStakeholderAgentResult(
 
   return {
     productContext: context,
-    agentMode: "gpt",
+    agentMode: "research-agent",
     model,
+    researchPlan,
+    researchReport,
     primaryBuyers,
     influencers,
     executiveApprovers,
     pathToDecisionMaker,
+    outreachDrafts,
     summary: typeof result.summary === "string" ? result.summary : "",
     reasoning: {
       scoringPriorities: sanitizeStringArray(result.reasoning?.scoringPriorities),
       primaryBuyerCriteria: sanitizeString(result.reasoning?.primaryBuyerCriteria),
       influencerCriteria: sanitizeString(result.reasoning?.influencerCriteria),
       executiveApproverCriteria: sanitizeString(result.reasoning?.executiveApproverCriteria)
-    }
+    },
+    trace: []
   };
 }
 
@@ -449,6 +634,133 @@ function sanitizeStakeholders(
       };
     })
     .filter((stakeholder): stakeholder is Stakeholder => Boolean(stakeholder));
+}
+
+function sanitizeResearchPlan(plan: Partial<ResearchPlan>, context: ProductContext): ResearchPlan {
+  return {
+    researchQuestions: sanitizeStringArray(plan.researchQuestions).slice(0, 8),
+    searchQueries: sanitizeStringArray(plan.searchQueries).slice(0, 8),
+    roleHypotheses: sanitizeStringArray(plan.roleHypotheses).slice(0, 8),
+    evidenceNeeded:
+      sanitizeStringArray(plan.evidenceNeeded).slice(0, 8).length > 0
+        ? sanitizeStringArray(plan.evidenceNeeded).slice(0, 8)
+        : [
+            `${context.targetCompany} engineering priorities`,
+            `${context.productCategory} ownership signals`,
+            `${context.competitor ?? "incumbent"} replacement risks`
+          ]
+  };
+}
+
+function sanitizeResearchReport(report: Partial<ResearchReport>): ResearchReport {
+  const sources = sanitizeResearchSources(report.sources);
+  const companySignals = sanitizeStringArray(report.companySignals);
+  const productFitSignals = sanitizeStringArray(report.productFitSignals);
+  const competitorSignals = sanitizeStringArray(report.competitorSignals);
+
+  return {
+    companySignals:
+      companySignals.length > 0
+        ? companySignals
+        : sources.slice(0, 3).map((source) => `Found public account evidence from ${source.title}.`),
+    productFitSignals:
+      productFitSignals.length > 0
+        ? productFitSignals
+        : sources.slice(0, 3).map((source) => `Source may inform frontend hosting/deployment fit: ${source.title}.`),
+    competitorSignals,
+    stakeholderSignals: Array.isArray(report.stakeholderSignals)
+      ? report.stakeholderSignals.map((signal) => ({
+          personId: typeof signal.personId === "string" ? signal.personId : undefined,
+          roleOrTeam: sanitizeString(signal.roleOrTeam),
+          signal: sanitizeString(signal.signal),
+          sourceUrls: sanitizeStringArray(signal.sourceUrls)
+        })).filter((signal) => signal.roleOrTeam || signal.signal || signal.sourceUrls.length > 0)
+      : [],
+    recommendedAngles: sanitizeStringArray(report.recommendedAngles),
+    sources
+  };
+}
+
+function sanitizeResearchSources(sources: ResearchSource[] | undefined): ResearchSource[] {
+  if (!Array.isArray(sources)) {
+    return [];
+  }
+
+  return sources
+    .map((source) => ({
+      title: sanitizeString(source.title),
+      url: sanitizeString(source.url),
+      relevance: sanitizeString(source.relevance)
+    }))
+    .filter((source) => source.url);
+}
+
+function extractOutreachDraftArray(value: unknown): unknown[] | undefined {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const candidates = [
+    record.outreachDrafts,
+    record.drafts,
+    record.emails,
+    record.outreach,
+    record.results,
+    record.messages
+  ];
+
+  return candidates.find((candidate): candidate is unknown[] => Array.isArray(candidate));
+}
+
+function sanitizeOutreachDrafts(drafts: unknown[] | undefined, stakeholders: Stakeholder[]): OutreachDraft[] {
+  if (!Array.isArray(drafts)) {
+    return [];
+  }
+
+  const allowedIds = new Set(stakeholders.map((stakeholder) => stakeholder.id));
+  const idByName = new Map(stakeholders.map((stakeholder) => [stakeholder.name, stakeholder.id]));
+  return drafts
+    .map((draft) => ({
+      personId: sanitizeDraftPersonId(draft, idByName),
+      name: sanitizeString(readDraftField(draft, ["name", "recipient", "to"])),
+      subject: sanitizeString(readDraftField(draft, ["subject", "subjectLine"])),
+      email: sanitizeEmailBody(readDraftField(draft, ["email", "body", "emailBody", "message"])),
+      rationale: sanitizeString(readDraftField(draft, ["rationale", "why", "reason"]))
+    }))
+    .filter((draft) => allowedIds.has(draft.personId) && draft.subject && draft.email);
+}
+
+function sanitizeDraftPersonId(value: unknown, idByName: Map<string, PersonId>): string {
+  const directId = sanitizeString(readDraftField(value, ["personId", "personID", "id", "stakeholderId"]));
+  if (directId) {
+    return directId;
+  }
+
+  const name = sanitizeString(readDraftField(value, ["name", "recipient", "to"]));
+  return idByName.get(name) ?? "";
+}
+
+function sanitizeEmailBody(value: unknown): string {
+  const text = sanitizeString(value);
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+    return "";
+  }
+
+  return text;
+}
+
+function readDraftField(value: unknown, fields: string[]): unknown {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  return fields.map((field) => record[field]).find((fieldValue) => fieldValue !== undefined);
 }
 
 function sanitizeStringArray(value: unknown): string[] {
