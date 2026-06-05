@@ -1,0 +1,879 @@
+{
+  "people": [
+    {
+      "id": "p0",
+      "name": "Mara Lindqvist",
+      "title": "Chief Executive Officer",
+      "department": "Executive",
+      "level": 0,
+      "reportsTo": null
+    },
+    {
+      "id": "p1",
+      "name": "Dev Ramaswamy",
+      "title": "Chief Technology Officer",
+      "department": "Engineering",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    {
+      "id": "p2",
+      "name": "Yuki Tanaka",
+      "title": "VP of Engineering, Frameworks",
+      "department": "Engineering",
+      "level": 2,
+      "reportsTo": "p1"
+    },
+    {
+      "id": "p3",
+      "name": "Priya Nair",
+      "title": "Engineering Manager, Next.js Core",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p2"
+    },
+    {
+      "id": "p4",
+      "name": "Tomás Herrera",
+      "title": "Staff Software Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p3"
+    },
+    {
+      "id": "p5",
+      "name": "Aisha Bello",
+      "title": "Senior Software Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p3"
+    },
+    {
+      "id": "p6",
+      "name": "Lars Eriksen",
+      "title": "Engineering Manager, Turbopack",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p2"
+    },
+    {
+      "id": "p7",
+      "name": "Mei Lin Chen",
+      "title": "Software Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p6"
+    },
+    {
+      "id": "p8",
+      "name": "Fatima Al-Sayed",
+      "title": "VP of Infrastructure",
+      "department": "Engineering",
+      "level": 2,
+      "reportsTo": "p1"
+    },
+    {
+      "id": "p9",
+      "name": "Owen Pritchard",
+      "title": "Director, Compute",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p8"
+    },
+    {
+      "id": "p10",
+      "name": "Diego Marsh",
+      "title": "Senior Infrastructure Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p9"
+    },
+    {
+      "id": "p11",
+      "name": "Hannah Berg",
+      "title": "Site Reliability Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p9"
+    },
+    {
+      "id": "p12",
+      "name": "Sofia Russo",
+      "title": "Director, Edge Network",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p8"
+    },
+    {
+      "id": "p13",
+      "name": "Kofi Mensah",
+      "title": "Network Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p12"
+    },
+    {
+      "id": "p14",
+      "name": "Raj Patel",
+      "title": "VP of Engineering, AI",
+      "department": "Engineering",
+      "level": 2,
+      "reportsTo": "p1"
+    },
+    {
+      "id": "p15",
+      "name": "Lucia Fernández",
+      "title": "Engineering Manager, AI Products",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p14"
+    },
+    {
+      "id": "p16",
+      "name": "Sven Olsson",
+      "title": "Machine Learning Engineer",
+      "department": "Data Science",
+      "level": 4,
+      "reportsTo": "p15"
+    },
+    {
+      "id": "p17",
+      "name": "Elena Vasquez",
+      "title": "Chief Product Officer",
+      "department": "Product",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    {
+      "id": "p18",
+      "name": "Noah Kim",
+      "title": "Director of Product",
+      "department": "Product",
+      "level": 2,
+      "reportsTo": "p17"
+    },
+    {
+      "id": "p19",
+      "name": "Amara Okafor",
+      "title": "Senior Product Manager",
+      "department": "Product",
+      "level": 3,
+      "reportsTo": "p18"
+    },
+    {
+      "id": "p20",
+      "name": "Felix Braun",
+      "title": "Product Manager",
+      "department": "Product",
+      "level": 3,
+      "reportsTo": "p18"
+    },
+    {
+      "id": "p21",
+      "name": "Yara Haddad",
+      "title": "Head of Design",
+      "department": "Design",
+      "level": 2,
+      "reportsTo": "p17"
+    },
+    {
+      "id": "p22",
+      "name": "Theo Lambert",
+      "title": "Senior Product Designer",
+      "department": "Design",
+      "level": 3,
+      "reportsTo": "p21"
+    },
+    {
+      "id": "p23",
+      "name": "Ingrid Sorensen",
+      "title": "Brand Designer",
+      "department": "Design",
+      "level": 3,
+      "reportsTo": "p21"
+    },
+    {
+      "id": "p24",
+      "name": "Marcus Donnelly",
+      "title": "Chief Revenue Officer",
+      "department": "Sales",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    {
+      "id": "p25",
+      "name": "Camila Rojas",
+      "title": "VP of Sales",
+      "department": "Sales",
+      "level": 2,
+      "reportsTo": "p24"
+    },
+    {
+      "id": "p26",
+      "name": "Jonah Weiss",
+      "title": "Enterprise Account Executive",
+      "department": "Sales",
+      "level": 3,
+      "reportsTo": "p25"
+    },
+    {
+      "id": "p27",
+      "name": "Leila Karimi",
+      "title": "Enterprise Account Executive",
+      "department": "Sales",
+      "level": 3,
+      "reportsTo": "p25"
+    },
+    {
+      "id": "p28",
+      "name": "Grace Mwangi",
+      "title": "Sales Manager, Mid-Market",
+      "department": "Sales",
+      "level": 3,
+      "reportsTo": "p25"
+    },
+    {
+      "id": "p29",
+      "name": "Daniel Pak",
+      "title": "Account Executive",
+      "department": "Sales",
+      "level": 4,
+      "reportsTo": "p28"
+    },
+    {
+      "id": "p30",
+      "name": "Henrik Vogel",
+      "title": "VP of Customer Success",
+      "department": "Support",
+      "level": 2,
+      "reportsTo": "p24"
+    },
+    {
+      "id": "p31",
+      "name": "Rosa Giordano",
+      "title": "Support Manager",
+      "department": "Support",
+      "level": 3,
+      "reportsTo": "p30"
+    },
+    {
+      "id": "p32",
+      "name": "Ahmed Saleh",
+      "title": "Customer Support Engineer",
+      "department": "Support",
+      "level": 4,
+      "reportsTo": "p31"
+    },
+    {
+      "id": "p33",
+      "name": "Bianca Moreau",
+      "title": "Chief Marketing Officer",
+      "department": "Marketing",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    {
+      "id": "p34",
+      "name": "Caleb Stone",
+      "title": "Director of Growth",
+      "department": "Marketing",
+      "level": 2,
+      "reportsTo": "p33"
+    },
+    {
+      "id": "p35",
+      "name": "Nadia Petrov",
+      "title": "Content Marketing Lead",
+      "department": "Marketing",
+      "level": 3,
+      "reportsTo": "p34"
+    },
+    {
+      "id": "p36",
+      "name": "Sam Whitfield",
+      "title": "Head of Developer Relations",
+      "department": "Marketing",
+      "level": 2,
+      "reportsTo": "p33"
+    },
+    {
+      "id": "p37",
+      "name": "Arthur Chen",
+      "title": "Chief Financial Officer",
+      "department": "Finance",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    {
+      "id": "p38",
+      "name": "Wei Zhang",
+      "title": "VP of Finance",
+      "department": "Finance",
+      "level": 2,
+      "reportsTo": "p37"
+    },
+    {
+      "id": "p39",
+      "name": "Maria Costa",
+      "title": "Senior Accountant",
+      "department": "Accounting",
+      "level": 3,
+      "reportsTo": "p38"
+    },
+    {
+      "id": "p40",
+      "name": "Olivia Hart",
+      "title": "Director of Operations",
+      "department": "Operations",
+      "level": 2,
+      "reportsTo": "p37"
+    },
+    {
+      "id": "p41",
+      "name": "Tariq Aziz",
+      "title": "Operations Manager",
+      "department": "Operations",
+      "level": 3,
+      "reportsTo": "p40"
+    },
+    {
+      "id": "p42",
+      "name": "Rebecca Stein",
+      "title": "General Counsel",
+      "department": "Legal",
+      "level": 2,
+      "reportsTo": "p37"
+    },
+    {
+      "id": "p43",
+      "name": "Zoe Adeyemi",
+      "title": "Chief People Officer",
+      "department": "People & HR",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    {
+      "id": "p44",
+      "name": "Liam O'Connor",
+      "title": "Director of Talent",
+      "department": "People & HR",
+      "level": 2,
+      "reportsTo": "p43"
+    },
+    {
+      "id": "p45",
+      "name": "Hana Suzuki",
+      "title": "Technical Recruiter",
+      "department": "People & HR",
+      "level": 3,
+      "reportsTo": "p44"
+    },
+    {
+      "id": "p46",
+      "name": "Gabriel Santos",
+      "title": "People Operations Manager",
+      "department": "People & HR",
+      "level": 2,
+      "reportsTo": "p43"
+    }
+  ],
+  "peopleMap": {
+    "p0": {
+      "id": "p0",
+      "name": "Mara Lindqvist",
+      "title": "Chief Executive Officer",
+      "department": "Executive",
+      "level": 0,
+      "reportsTo": null
+    },
+    "p1": {
+      "id": "p1",
+      "name": "Dev Ramaswamy",
+      "title": "Chief Technology Officer",
+      "department": "Engineering",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    "p2": {
+      "id": "p2",
+      "name": "Yuki Tanaka",
+      "title": "VP of Engineering, Frameworks",
+      "department": "Engineering",
+      "level": 2,
+      "reportsTo": "p1"
+    },
+    "p3": {
+      "id": "p3",
+      "name": "Priya Nair",
+      "title": "Engineering Manager, Next.js Core",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p2"
+    },
+    "p4": {
+      "id": "p4",
+      "name": "Tomás Herrera",
+      "title": "Staff Software Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p3"
+    },
+    "p5": {
+      "id": "p5",
+      "name": "Aisha Bello",
+      "title": "Senior Software Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p3"
+    },
+    "p6": {
+      "id": "p6",
+      "name": "Lars Eriksen",
+      "title": "Engineering Manager, Turbopack",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p2"
+    },
+    "p7": {
+      "id": "p7",
+      "name": "Mei Lin Chen",
+      "title": "Software Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p6"
+    },
+    "p8": {
+      "id": "p8",
+      "name": "Fatima Al-Sayed",
+      "title": "VP of Infrastructure",
+      "department": "Engineering",
+      "level": 2,
+      "reportsTo": "p1"
+    },
+    "p9": {
+      "id": "p9",
+      "name": "Owen Pritchard",
+      "title": "Director, Compute",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p8"
+    },
+    "p10": {
+      "id": "p10",
+      "name": "Diego Marsh",
+      "title": "Senior Infrastructure Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p9"
+    },
+    "p11": {
+      "id": "p11",
+      "name": "Hannah Berg",
+      "title": "Site Reliability Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p9"
+    },
+    "p12": {
+      "id": "p12",
+      "name": "Sofia Russo",
+      "title": "Director, Edge Network",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p8"
+    },
+    "p13": {
+      "id": "p13",
+      "name": "Kofi Mensah",
+      "title": "Network Engineer",
+      "department": "Engineering",
+      "level": 4,
+      "reportsTo": "p12"
+    },
+    "p14": {
+      "id": "p14",
+      "name": "Raj Patel",
+      "title": "VP of Engineering, AI",
+      "department": "Engineering",
+      "level": 2,
+      "reportsTo": "p1"
+    },
+    "p15": {
+      "id": "p15",
+      "name": "Lucia Fernández",
+      "title": "Engineering Manager, AI Products",
+      "department": "Engineering",
+      "level": 3,
+      "reportsTo": "p14"
+    },
+    "p16": {
+      "id": "p16",
+      "name": "Sven Olsson",
+      "title": "Machine Learning Engineer",
+      "department": "Data Science",
+      "level": 4,
+      "reportsTo": "p15"
+    },
+    "p17": {
+      "id": "p17",
+      "name": "Elena Vasquez",
+      "title": "Chief Product Officer",
+      "department": "Product",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    "p18": {
+      "id": "p18",
+      "name": "Noah Kim",
+      "title": "Director of Product",
+      "department": "Product",
+      "level": 2,
+      "reportsTo": "p17"
+    },
+    "p19": {
+      "id": "p19",
+      "name": "Amara Okafor",
+      "title": "Senior Product Manager",
+      "department": "Product",
+      "level": 3,
+      "reportsTo": "p18"
+    },
+    "p20": {
+      "id": "p20",
+      "name": "Felix Braun",
+      "title": "Product Manager",
+      "department": "Product",
+      "level": 3,
+      "reportsTo": "p18"
+    },
+    "p21": {
+      "id": "p21",
+      "name": "Yara Haddad",
+      "title": "Head of Design",
+      "department": "Design",
+      "level": 2,
+      "reportsTo": "p17"
+    },
+    "p22": {
+      "id": "p22",
+      "name": "Theo Lambert",
+      "title": "Senior Product Designer",
+      "department": "Design",
+      "level": 3,
+      "reportsTo": "p21"
+    },
+    "p23": {
+      "id": "p23",
+      "name": "Ingrid Sorensen",
+      "title": "Brand Designer",
+      "department": "Design",
+      "level": 3,
+      "reportsTo": "p21"
+    },
+    "p24": {
+      "id": "p24",
+      "name": "Marcus Donnelly",
+      "title": "Chief Revenue Officer",
+      "department": "Sales",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    "p25": {
+      "id": "p25",
+      "name": "Camila Rojas",
+      "title": "VP of Sales",
+      "department": "Sales",
+      "level": 2,
+      "reportsTo": "p24"
+    },
+    "p26": {
+      "id": "p26",
+      "name": "Jonah Weiss",
+      "title": "Enterprise Account Executive",
+      "department": "Sales",
+      "level": 3,
+      "reportsTo": "p25"
+    },
+    "p27": {
+      "id": "p27",
+      "name": "Leila Karimi",
+      "title": "Enterprise Account Executive",
+      "department": "Sales",
+      "level": 3,
+      "reportsTo": "p25"
+    },
+    "p28": {
+      "id": "p28",
+      "name": "Grace Mwangi",
+      "title": "Sales Manager, Mid-Market",
+      "department": "Sales",
+      "level": 3,
+      "reportsTo": "p25"
+    },
+    "p29": {
+      "id": "p29",
+      "name": "Daniel Pak",
+      "title": "Account Executive",
+      "department": "Sales",
+      "level": 4,
+      "reportsTo": "p28"
+    },
+    "p30": {
+      "id": "p30",
+      "name": "Henrik Vogel",
+      "title": "VP of Customer Success",
+      "department": "Support",
+      "level": 2,
+      "reportsTo": "p24"
+    },
+    "p31": {
+      "id": "p31",
+      "name": "Rosa Giordano",
+      "title": "Support Manager",
+      "department": "Support",
+      "level": 3,
+      "reportsTo": "p30"
+    },
+    "p32": {
+      "id": "p32",
+      "name": "Ahmed Saleh",
+      "title": "Customer Support Engineer",
+      "department": "Support",
+      "level": 4,
+      "reportsTo": "p31"
+    },
+    "p33": {
+      "id": "p33",
+      "name": "Bianca Moreau",
+      "title": "Chief Marketing Officer",
+      "department": "Marketing",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    "p34": {
+      "id": "p34",
+      "name": "Caleb Stone",
+      "title": "Director of Growth",
+      "department": "Marketing",
+      "level": 2,
+      "reportsTo": "p33"
+    },
+    "p35": {
+      "id": "p35",
+      "name": "Nadia Petrov",
+      "title": "Content Marketing Lead",
+      "department": "Marketing",
+      "level": 3,
+      "reportsTo": "p34"
+    },
+    "p36": {
+      "id": "p36",
+      "name": "Sam Whitfield",
+      "title": "Head of Developer Relations",
+      "department": "Marketing",
+      "level": 2,
+      "reportsTo": "p33"
+    },
+    "p37": {
+      "id": "p37",
+      "name": "Arthur Chen",
+      "title": "Chief Financial Officer",
+      "department": "Finance",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    "p38": {
+      "id": "p38",
+      "name": "Wei Zhang",
+      "title": "VP of Finance",
+      "department": "Finance",
+      "level": 2,
+      "reportsTo": "p37"
+    },
+    "p39": {
+      "id": "p39",
+      "name": "Maria Costa",
+      "title": "Senior Accountant",
+      "department": "Accounting",
+      "level": 3,
+      "reportsTo": "p38"
+    },
+    "p40": {
+      "id": "p40",
+      "name": "Olivia Hart",
+      "title": "Director of Operations",
+      "department": "Operations",
+      "level": 2,
+      "reportsTo": "p37"
+    },
+    "p41": {
+      "id": "p41",
+      "name": "Tariq Aziz",
+      "title": "Operations Manager",
+      "department": "Operations",
+      "level": 3,
+      "reportsTo": "p40"
+    },
+    "p42": {
+      "id": "p42",
+      "name": "Rebecca Stein",
+      "title": "General Counsel",
+      "department": "Legal",
+      "level": 2,
+      "reportsTo": "p37"
+    },
+    "p43": {
+      "id": "p43",
+      "name": "Zoe Adeyemi",
+      "title": "Chief People Officer",
+      "department": "People & HR",
+      "level": 1,
+      "reportsTo": "p0"
+    },
+    "p44": {
+      "id": "p44",
+      "name": "Liam O'Connor",
+      "title": "Director of Talent",
+      "department": "People & HR",
+      "level": 2,
+      "reportsTo": "p43"
+    },
+    "p45": {
+      "id": "p45",
+      "name": "Hana Suzuki",
+      "title": "Technical Recruiter",
+      "department": "People & HR",
+      "level": 3,
+      "reportsTo": "p44"
+    },
+    "p46": {
+      "id": "p46",
+      "name": "Gabriel Santos",
+      "title": "People Operations Manager",
+      "department": "People & HR",
+      "level": 2,
+      "reportsTo": "p43"
+    }
+  },
+  "childrenMap": {
+    "p0": [
+      "p1",
+      "p17",
+      "p24",
+      "p33",
+      "p37",
+      "p43"
+    ],
+    "p1": [
+      "p2",
+      "p8",
+      "p14"
+    ],
+    "p2": [
+      "p3",
+      "p6"
+    ],
+    "p3": [
+      "p4",
+      "p5"
+    ],
+    "p4": [],
+    "p5": [],
+    "p6": [
+      "p7"
+    ],
+    "p7": [],
+    "p8": [
+      "p9",
+      "p12"
+    ],
+    "p9": [
+      "p10",
+      "p11"
+    ],
+    "p10": [],
+    "p11": [],
+    "p12": [
+      "p13"
+    ],
+    "p13": [],
+    "p14": [
+      "p15"
+    ],
+    "p15": [
+      "p16"
+    ],
+    "p16": [],
+    "p17": [
+      "p18",
+      "p21"
+    ],
+    "p18": [
+      "p19",
+      "p20"
+    ],
+    "p19": [],
+    "p20": [],
+    "p21": [
+      "p22",
+      "p23"
+    ],
+    "p22": [],
+    "p23": [],
+    "p24": [
+      "p25",
+      "p30"
+    ],
+    "p25": [
+      "p26",
+      "p27",
+      "p28"
+    ],
+    "p26": [],
+    "p27": [],
+    "p28": [
+      "p29"
+    ],
+    "p29": [],
+    "p30": [
+      "p31"
+    ],
+    "p31": [
+      "p32"
+    ],
+    "p32": [],
+    "p33": [
+      "p34",
+      "p36"
+    ],
+    "p34": [
+      "p35"
+    ],
+    "p35": [],
+    "p36": [],
+    "p37": [
+      "p38",
+      "p40",
+      "p42"
+    ],
+    "p38": [
+      "p39"
+    ],
+    "p39": [],
+    "p40": [
+      "p41"
+    ],
+    "p41": [],
+    "p42": [],
+    "p43": [
+      "p44",
+      "p46"
+    ],
+    "p44": [
+      "p45"
+    ],
+    "p45": [],
+    "p46": []
+  },
+  "rootId": "p0"
+}
