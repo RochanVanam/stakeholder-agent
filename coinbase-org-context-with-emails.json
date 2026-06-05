@@ -1,0 +1,165 @@
+{
+  "company": {
+    "name": "Coinbase",
+    "domain": "coinbase.com",
+    "employeeRange": "5000-10000",
+    "positionsTracked": 4319
+  },
+  "selectedContacts": [
+    {
+      "fullName": "Denny Morawiak",
+      "firstName": "Denny",
+      "lastName": "Morawiak",
+      "status": "leader",
+      "title": "Managing Director",
+      "department": "Engineering",
+      "teams": [],
+      "seniority": "Director",
+      "influence": "high",
+      "reportsTo": "Brian Armstrong",
+      "level": 1,
+      "contactPriority": 1,
+      "contactScore": 95,
+      "contactReasons": [
+        "High influence in source context (Managing Director, Engineering).",
+        "Direct relevance to frontend/deployment buying context and authority to influence partnerships.",
+        "Public-facing leadership role suitable for strategic platform decisions (Vercel for Coinbase integration)."
+      ],
+      "contactEvidenceUrls": [
+        "https://www.coinbase.com/en/blog/open-sourcing-coinbases-secure-deployment-pipeline",
+        "https://www.coinbase.com/blog/bootstrapping-the-coinbase-monorepo"
+      ],
+      "email": null,
+      "emailStatus": "not_found"
+    },
+    {
+      "fullName": "Jesse Pollak",
+      "firstName": "Jesse",
+      "lastName": "Pollak",
+      "status": "senior-leader",
+      "title": "VP, Engineering",
+      "department": "Engineering",
+      "teams": [],
+      "seniority": "VP / Head",
+      "influence": "low",
+      "reportsTo": "Brian Armstrong",
+      "level": 1,
+      "contactPriority": 2,
+      "contactScore": 88,
+      "contactReasons": [
+        "VP, Engineering — senior leadership with influence over deployment tooling and frontend platform decisions.",
+        "Relevant to frontend/deployment buying context; positioned to evaluate platform partnerships."
+      ],
+      "contactEvidenceUrls": [
+        "https://www.coinbase.com/blog/bootstrapping-the-coinbase-monorepo"
+      ],
+      "email": "jpollak@coinbase.com",
+      "emailStatus": "found"
+    },
+    {
+      "fullName": "Aadhav Sundar",
+      "firstName": "Aadhav",
+      "lastName": "Sundar",
+      "status": "team-member",
+      "title": null,
+      "department": "Software Development",
+      "teams": [
+        "Software Development"
+      ],
+      "seniority": "Unknown",
+      "influence": "none",
+      "reportsTo": null,
+      "level": null,
+      "contactPriority": 3,
+      "contactScore": 60,
+      "contactReasons": [
+        "Software development role with direct relevance to frontend deployment workloads.",
+        "Potential mid-to-senior level counterpart for platform engineering discussions."
+      ],
+      "contactEvidenceUrls": [
+        "https://www.coinbase.com/blog/bootstrapping-the-coinbase-monorepo"
+      ],
+      "email": null,
+      "emailStatus": "not_found"
+    }
+  ],
+  "contactAgent": {
+    "selectedContactIds": [
+      "7",
+      "6",
+      "9"
+    ],
+    "emailSummary": {
+      "total": 3,
+      "found": 1,
+      "notFound": 2,
+      "ambiguous": 0,
+      "errors": 0
+    },
+    "research": {
+      "questions": [
+        "What are Coinbase's current frontend hosting/deployment priorities and pain points (speed, reliability, scalability, DX, CI/CD integration)?",
+        "Which teams within Coinbase own frontend infrastructure, deployment tooling, and platform reliability (engineering, platform, SRE, dev tools)?",
+        "What are Coinbase's near-term roadmap initiatives (e.g., web app performance goals, edge deployment, component sharing, monorepo strategy) that Vercel could influence?",
+        "Who are Coinbase's strategic tech partners and current tooling (hosting/CDN, deployment pipelines, feature flagging, observability) and how do they evaluate alternatives?",
+        "How does Coinbase evaluate competitor tooling (e.g., Cloudflare) and what gaps could Vercel address (pricing, performance, ease of migration, support for complex deployments)?",
+        "What are the decision criteria and signing authorities for selecting a frontend hosting/deployment platform at Coinbase?",
+        "What internal metrics or success criteria would indicate value from a Vercel engagement (time-to-market, page load speed, build times, error rates, SLO/SLA targets)?",
+        "Are there current security, compliance, or data residency requirements that affect deployment platform choices at Coinbase?"
+      ],
+      "searchQueries": [
+        "Coinbase engineering organization structure frontend deployment",
+        "Coinbase platform engineering SRE frontend tooling",
+        "Coinbase web performance goals 2024 2025",
+        "Coinbase deployment pipeline tooling GitHub Actions Jenkins CircleCI",
+        "Coinbase Vercel integration frontend hosting",
+        "Coinbase Cloudflare competitor comparison performance",
+        "Coinbase security compliance requirements data residency deployment",
+        "Coinbase policy for vendor approvals engineering"
+      ],
+      "signals": [
+        "Coinbase has publicly discussed a secure deployment pipeline and monorepo approach to tooling and reliability (evidence from Coinbase blog posts on secure deployment pipelines and monorepo strategy).",
+        "Coinbase emphasizes internal tooling to accelerate shipping and enforce code conventions, with references to internal deployment orchestration (Codeflow) and a release process.",
+        "Coinbase has an engineering-focused public presence with frontend work and consumer-facing platforms, indicating ongoing frontend deployment and performance objectives.",
+        "Vercel aligns with Coinbase’s interest in fast, reliable frontend hosting/deployment, monorepo tooling, and efficient CI/CD workflows as evidenced by Coinbase’s public monorepo and deployment tooling discussions.",
+        "Coinbase’s focus on reducing delivery time and improving developer experience (DX) through internal tooling and automation signals a good fit for a platform that emphasizes edge deployment, fast builds, and cohesive frontend hosting.",
+        "Cloudflare is a known competitor/alternative in performance, edge delivery, and security; Coinbase has cited Cloudflare as a reference point for tooling evaluation in the market.",
+        "Cloudflare materials show emphasis on performance and edge capabilities that Coinbase may compare against when evaluating frontend hosting/deployment partners."
+      ],
+      "sources": [
+        {
+          "title": "Open Sourcing Coinbase’s Secure Deployment Pipeline",
+          "url": "https://www.coinbase.com/en/blog/open-sourcing-coinbases-secure-deployment-pipeline"
+        },
+        {
+          "title": "Bootstrapping the Coinbase Monorepo",
+          "url": "https://www.coinbase.com/blog/bootstrapping-the-coinbase-monorepo"
+        },
+        {
+          "title": "Coinbase - Frontend Development | The Org",
+          "url": "https://theorg.com/org/coinbase/teams/frontend-development"
+        },
+        {
+          "title": "Automating Figma-to-Code at Coinbase",
+          "url": "https://www.coinbase.com/blog/automating-figma-to-code-at-coinbase"
+        },
+        {
+          "title": "Staff Software Engineer, Frontend (Consumer -CB1,Growth) - Coinbase Careers",
+          "url": "https://www.coinbase.com/careers/positions/7300575"
+        },
+        {
+          "title": "Cloudflare Analytics",
+          "url": "https://www.cloudflare.com/analytics/"
+        },
+        {
+          "title": "Cloudflare CDN whitepaper",
+          "url": "https://www.cloudflare.com/static/839a7f8c9ba01f8cfe9d0a41c53df20c/cloudflare-cdn-whitepaper-19Q4.pdf"
+        },
+        {
+          "title": "Cloudflare – A Developer's Guide to Media Optimization",
+          "url": "https://www.cloudflare.com/resources/assets/slt3lc6tev37/76OowVPNaxwlbzZC9z5LpN/f8620e467799b0920ebd01fdb222798b/A_Developers_Guide_to_Media_Optimization.pdf"
+        }
+      ]
+    }
+  }
+}

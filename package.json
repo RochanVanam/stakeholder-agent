@@ -1,13 +1,14 @@
 {
-  "name": "gtm-stakeholder-agent",
+  "name": "company-email-finder-agent",
   "version": "0.1.0",
-  "description": "Stakeholder Agent for the GTM Agent Broker hackathon project.",
+  "description": "Tool-using contact selection and email enrichment agent.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "demo": "node --experimental-strip-types src/index.ts --org example.json --sellerCompany Vercel --targetCompany NVIDIA --productCategory \"frontend hosting/deployment\" --competitor Cloudflare",
+    "demo": "node --experimental-strip-types src/index.ts --domain coinbase --output coinbase-org-context-with-emails.json --top 3 --sellerCompany Vercel --targetCompany Coinbase --productCategory \"frontend hosting/deployment\" --competitor Cloudflare",
     "check:runtime": "node --experimental-strip-types --check src/index.ts",
+    "test": "node --experimental-strip-types --test src/index.test.ts",
     "build": "tsc -p tsconfig.json"
   },
   "devDependencies": {

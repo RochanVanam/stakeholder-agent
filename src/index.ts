@@ -1,123 +1,148 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type PersonId = string;
+export type EmailStatus = "found" | "not_found" | "ambiguous" | "error";
+export type Confidence = "high" | "medium" | "low";
+export type MatchMethod = "email_finder";
 
-export interface Person {
-  id: PersonId;
-  name: string;
-  title: string;
-  department: string;
-  level: number;
-  reportsTo: PersonId | null;
-}
-
-export interface OrgChart {
-  rootId?: PersonId;
-  people?: Person[];
-  peopleMap?: Record<PersonId, Person>;
-  childrenMap?: Record<PersonId, PersonId[]>;
-}
-
-export interface ProductContext {
-  sellerCompany: string;
-  targetCompany: string;
-  productCategory: string;
+export type ContactContext = {
+  sellerCompany?: string;
+  targetCompany?: string;
+  productCategory?: string;
   competitor?: string;
-}
+};
 
-export interface ScoreResult {
-  score: number;
-  authorityScore: number;
-  relevanceScore: number;
-  matchedKeywords: string[];
-  reasons: string[];
-}
+export type NormalizedPerson = {
+  inputId?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName: string;
+  title?: string;
+  department?: string;
+  companyName: string;
+  companyDomain?: string;
+  linkedinUrl?: string;
+  valueTier?: string;
+  influence?: string;
+  seniority?: string;
+  seniorityRank?: number;
+  reportSpan?: number;
+  directReports?: number;
+  reportsTo?: string | null;
+  level?: number | null;
+  teams?: string[];
+};
 
-export interface Stakeholder extends Person {
-  score: number;
-  matchedKeywords: string[];
-  reasons: string[];
-}
+export type SelectedContact = NormalizedPerson & {
+  contactPriority: number;
+  contactScore: number;
+  contactReasons: string[];
+  evidenceUrls?: string[];
+};
 
-export interface ResearchPlan {
+export type EmailFinderResultItem = {
+  inputId?: string;
+  fullName: string;
+  companyName: string;
+  companyDomain?: string;
+  email?: string;
+  status: EmailStatus;
+  confidence: Confidence;
+  provider: "hunter";
+  matchMethod: MatchMethod;
+  notes: string[];
+};
+
+export type EmailFinderResult = {
+  results: EmailFinderResultItem[];
+  summary: {
+    total: number;
+    found: number;
+    notFound: number;
+    ambiguous: number;
+    errors: number;
+  };
+};
+
+export type ResearchPlan = {
   researchQuestions: string[];
   searchQueries: string[];
-  roleHypotheses: string[];
   evidenceNeeded: string[];
-}
+};
 
-export interface ResearchSource {
-  title: string;
-  url: string;
-  relevance: string;
-}
+export type ResearchSignal = {
+  topic: string;
+  evidence: string;
+  sourceUrl?: string;
+  relevantRoles: string[];
+  relevantPeople?: string[];
+};
 
-export interface ResearchReport {
+export type ResearchReport = {
   companySignals: string[];
   productFitSignals: string[];
   competitorSignals: string[];
-  stakeholderSignals: Array<{
-    personId?: PersonId;
-    roleOrTeam: string;
-    signal: string;
-    sourceUrls: string[];
+  stakeholderSignals: ResearchSignal[];
+  recommendedContactAngles: string[];
+  sources: Array<{
+    title: string;
+    url: string;
   }>;
-  recommendedAngles: string[];
-  sources: ResearchSource[];
-}
+};
 
-export interface OutreachDraft {
-  personId: PersonId;
-  name: string;
-  subject: string;
-  email: string;
-  rationale: string;
-}
-
-export interface AgentTraceStep {
+export type ContactAgentTraceStep = {
   step: string;
-  why: string;
+  tool: "openai" | "hunter" | "local";
   outputSummary: string;
-}
+};
 
-export interface StakeholderAgentResult {
-  productContext: ProductContext;
-  agentMode: "research-agent";
-  model: string;
+export type ContactAgentResult = {
+  contactContext: ContactContext;
   researchPlan: ResearchPlan;
   researchReport: ResearchReport;
-  primaryBuyers: Stakeholder[];
-  influencers: Stakeholder[];
-  executiveApprovers: Stakeholder[];
-  pathToDecisionMaker: Stakeholder[];
-  outreachDrafts: OutreachDraft[];
-  summary: string;
-  reasoning: {
-    scoringPriorities: string[];
-    primaryBuyerCriteria: string;
-    influencerCriteria: string;
-    executiveApproverCriteria: string;
-  };
-  trace: AgentTraceStep[];
-}
+  selectedContacts: SelectedContact[];
+  emailLookup: EmailFinderResult;
+  enrichedJson: unknown;
+  trace: ContactAgentTraceStep[];
+};
 
-export interface StakeholderAgentOptions {
+export type ContactAgentOptions = {
+  hunterApiKey?: string;
+  openaiApiKey?: string;
   model?: string;
-  apiKey?: string;
-}
+  topN?: number;
+  candidateLimit?: number;
+  fetchImpl?: typeof fetch;
+};
 
-type LoadableOrgChart = OrgChart | string | URL;
+type UnknownRecord = Record<string, unknown>;
 
-interface OpenAIResponse {
-  status?: string;
-  incomplete_details?: {
-    reason?: string;
-  };
+type HunterEmailFinderResponse = {
+  data?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    score?: number | null;
+    domain?: string | null;
+    position?: string | null;
+    company?: string | null;
+    linkedin_url?: string | null;
+    verification?: {
+      status?: string | null;
+      date?: string | null;
+    } | null;
+  } | null;
+  errors?: Array<{
+    id?: string;
+    code?: number;
+    details?: string;
+  }>;
+};
+
+type OpenAIResponse = {
   output_text?: string;
   output?: Array<{
-    type?: string;
     content?: Array<{
       text?: string;
     }>;
@@ -125,642 +150,967 @@ interface OpenAIResponse {
   error?: {
     message?: string;
   };
+};
+
+const HUNTER_EMAIL_FINDER_URL = "https://api.hunter.io/v2/email-finder";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+const PEOPLE_API_URL = "https://shiptheagent.vercel.app/api/people";
+const DEFAULT_SELECTOR_MODEL = "gpt-5-nano";
+
+export function loadPeopleInput(path = "coinbase-org-context.json"): unknown {
+  return JSON.parse(readFileSync(resolve(path), "utf8")) as unknown;
 }
 
-interface CliArgs {
-  orgPath: string;
-  productContext: ProductContext;
-  options: StakeholderAgentOptions;
-}
+export async function loadPeopleInputFromApi(
+  companyDomain: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<unknown> {
+  const url = new URL(PEOPLE_API_URL);
+  url.searchParams.set("domain", companyDomain);
 
-interface OpenAICallInput {
-  options: StakeholderAgentOptions;
-  task: string;
-  payload: unknown;
-  systemPrompt?: string;
-  useWebSearch?: boolean;
-  maxOutputTokens?: number;
-}
-
-const DEFAULT_GPT_MODEL = "gpt-5-nano";
-
-const STAKEHOLDER_AGENT_SYSTEM_PROMPT = [
-  "You are the Stakeholder Agent in a GTM Agent Broker.",
-  "Work like a human GTM researcher: form hypotheses, research the account, map evidence to roles, then decide who to contact.",
-  "Return only valid JSON. Do not wrap JSON in markdown.",
-  "Every selected stakeholder must come from the provided org chart.",
-  "Keep each selected stakeholder's id, name, title, department, level, and reportsTo exactly as provided.",
-  "Scores must be integers from 0 to 100.",
-  "Each selected stakeholder must include 1-2 non-empty reasons under 16 words each.",
-  "For productCategory = frontend hosting/deployment, prioritize platform engineering, web infrastructure, developer experience, frontend infrastructure, hosting, deployment, site reliability, engineering tooling, and cloud infrastructure.",
-  "If research evidence conflicts with the org chart, use the org chart for identity and reporting structure, and research for account-specific rationale."
-].join(" ");
-
-export function loadOrgChart(input: LoadableOrgChart = "example.json"): OrgChart {
-  if (typeof input === "object" && !(input instanceof URL)) {
-    return normalizeOrgChart(input);
+  const response = await fetchImpl(url.toString(), {
+    method: "GET",
+    headers: {
+      accept: "application/json"
+    }
+  });
+  const text = await response.text();
+  const json = text ? (JSON.parse(text) as unknown) : {};
+  if (!response.ok) {
+    throw new Error(`People API error ${response.status}: ${response.statusText}`);
   }
 
-  const path = input instanceof URL ? fileURLToPath(input) : resolve(input);
-  const raw = readFileSync(path, "utf8");
-  return normalizeOrgChart(JSON.parse(raw) as OrgChart);
+  return normalizePeopleApiInput(json, companyDomain);
 }
 
-export function flattenOrgTree(orgChart: OrgChart): Person[] {
-  const normalized = normalizeOrgChart(orgChart);
-  const peopleMap = normalized.peopleMap ?? {};
-  const childrenMap = normalized.childrenMap ?? buildChildrenMap(Object.values(peopleMap));
-  const rootId = normalized.rootId ?? findRootId(Object.values(peopleMap));
-  const visited = new Set<PersonId>();
-  const flattened: Person[] = [];
+export function normalizePeopleInput(input: unknown): NormalizedPerson[] {
+  const root = asRecord(input);
+  const data = asRecord(root?.data);
+  const company = asRecord(root?.company) ?? asRecord(data?.company);
+  const defaultCompanyName = readString(company, ["name", "companyName", "organizationName"]);
+  const defaultCompanyDomain = normalizeCompanyDomainValue(readString(company, ["domain", "companyDomain", "primaryDomain", "website"]));
+  const people = getPeopleArray(input) ?? [];
 
-  const visit = (id: PersonId): void => {
-    const person = peopleMap[id];
-    if (!person || visited.has(id)) {
-      return;
-    }
-
-    visited.add(id);
-    flattened.push(person);
-
-    for (const childId of childrenMap[id] ?? []) {
-      visit(childId);
-    }
-  };
-
-  if (rootId) {
-    visit(rootId);
-  }
-
-  for (const person of Object.values(peopleMap).sort(byOrgPosition)) {
-    if (!visited.has(person.id)) {
-      visit(person.id);
-    }
-  }
-
-  return flattened;
+  return people
+    .map((rawPerson, index) => normalizePerson(rawPerson, index, defaultCompanyName, defaultCompanyDomain))
+    .filter((person): person is NormalizedPerson => Boolean(person));
 }
 
-export async function scorePerson(
-  person: Person,
-  context: ProductContext,
-  options: StakeholderAgentOptions = {}
-): Promise<ScoreResult> {
-  return callOpenAIJson<ScoreResult>({
-    options,
-    task: "Score this single person for the buying committee.",
-    payload: {
-      productContext: context,
-      person,
-      instructions:
-        "Return exactly these fields: score, authorityScore, relevanceScore, matchedKeywords, reasons. Reasons must contain 1-2 non-empty short strings."
-    }
-  });
-}
+export async function runContactAgent(
+  input: unknown,
+  context: ContactContext = {},
+  options: ContactAgentOptions = {}
+): Promise<ContactAgentResult> {
+  const people = normalizePeopleInput(input);
+  const topN = options.topN ?? 3;
+  const candidateLimit = options.candidateLimit ?? 30;
+  const trace: ContactAgentTraceStep[] = [];
 
-export async function planResearch(
-  orgChart: OrgChart,
-  context: ProductContext,
-  options: StakeholderAgentOptions = {}
-): Promise<ResearchPlan> {
-  const normalized = normalizeOrgChart(orgChart);
-  const people = flattenOrgTree(normalized);
-  const plan = await callOpenAIJson<Partial<ResearchPlan>>({
-    options,
-    task: "Create a concise account research plan before choosing stakeholders.",
-    payload: {
-      productContext: context,
-      orgChartSummary: summarizeOrgForPrompt(people),
-      instructions:
-        "Return researchQuestions, searchQueries, roleHypotheses, and evidenceNeeded. Include queries about target company engineering priorities, web/frontend/developer platform initiatives, infrastructure strategy, and competitor context."
-    },
-    maxOutputTokens: 1800
-  });
-
-  return sanitizeResearchPlan(plan, context);
-}
-
-export async function conductCompanyResearch(
-  orgChart: OrgChart,
-  context: ProductContext,
-  researchPlan: ResearchPlan,
-  options: StakeholderAgentOptions = {}
-): Promise<ResearchReport> {
-  const normalized = normalizeOrgChart(orgChart);
-  const people = flattenOrgTree(normalized);
-  const report = await callOpenAIJson<Partial<ResearchReport>>({
-    options,
-    task: "Research the account like a human sales researcher, then summarize evidence for stakeholder selection.",
-    payload: {
-      productContext: context,
-      researchPlan,
-      orgChartPeople: summarizeOrgForPrompt(people),
-      instructions:
-        "Use web research to find public evidence about the target company's engineering priorities, product launches, frontend/web properties, developer platform needs, infrastructure strategy, reliability concerns, and competitor context. Return non-empty companySignals, productFitSignals, competitorSignals, stakeholderSignals, recommendedAngles, and sources. Each stakeholderSignal must include a non-empty roleOrTeam, signal, and sourceUrls. Include URLs in sources and sourceUrls."
-    },
-    useWebSearch: true,
-    maxOutputTokens: 5000
-  });
-
-  return sanitizeResearchReport(report);
-}
-
-export async function classifyStakeholders(
-  orgChart: OrgChart,
-  context: ProductContext,
-  options: StakeholderAgentOptions = {},
-  researchReport?: ResearchReport
-): Promise<StakeholderAgentResult> {
-  const normalized = normalizeOrgChart(orgChart);
-  const model = options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_GPT_MODEL;
-  const people = flattenOrgTree(normalized);
-  const effectiveResearchReport =
-    researchReport ?? (await conductCompanyResearch(normalized, context, await planResearch(normalized, context, options), options));
-  const result = await callOpenAIJson<Partial<StakeholderAgentResult>>({
-    options: { ...options, model },
-    task: "Use the research report and org chart to select the stakeholder buying committee.",
-    payload: {
-      productContext: context,
-      researchReport: effectiveResearchReport,
-      orgChart: {
-        rootId: normalized.rootId,
-        people,
-        childrenMap: normalized.childrenMap
-      },
-      instructions:
-        "Return exactly these top-level fields: productContext, agentMode, model, primaryBuyers, influencers, executiveApprovers, pathToDecisionMaker, summary, reasoning. " +
-        "primaryBuyers must contain 3-5 people who own evaluation and buying criteria. " +
-        "influencers must contain 3-6 people who validate technical fit, migration risk, developer experience, and incumbent replacement concerns. " +
-        "executiveApprovers must contain 2-4 senior leaders likely to approve budget, strategic platform risk, security, legal, or procurement. " +
-        "pathToDecisionMaker must be a valid reportsTo chain from the strongest primary buyer upward. " +
-        "Each stakeholder must include id, name, title, department, level, reportsTo, score, matchedKeywords, and reasons. Reasons should reference research evidence when possible. " +
-        "Do not include schema examples, outputContract, stakeholderShape, or any extra top-level fields."
-    },
-    maxOutputTokens: 5000
-  });
-
-  const placeholderPlan = sanitizeResearchPlan({}, context);
-  return sanitizeStakeholderAgentResult(result, context, model, normalized, placeholderPlan, effectiveResearchReport, []);
-}
-
-export async function draftOutreach(
-  stakeholders: Stakeholder[],
-  context: ProductContext,
-  researchReport: ResearchReport,
-  options: StakeholderAgentOptions = {}
-): Promise<OutreachDraft[]> {
-  const drafts = await callOpenAIJson<unknown>({
-    systemPrompt:
-      "You are a concise enterprise sales researcher. Return only valid JSON with first-touch outreach drafts. Do not wrap JSON in markdown.",
-    options,
-    task: "Draft concise first-touch outreach emails for the selected stakeholders.",
-    payload: {
-      productContext: context,
-      stakeholders: stakeholders.slice(0, 3),
-      researchReport,
-      instructions:
-        "Return exactly one top-level field named outreachDrafts. Draft one email body for each provided stakeholder. Each draft must include the exact personId, exact name, subject, email, and rationale. The email field must be the message body, not an email address. Do not invent recipient email addresses, private facts, or personal details. Keep emails short, specific, and grounded in the research report."
-    },
-    maxOutputTokens: 3500
-  });
-
-  return sanitizeOutreachDrafts(extractOutreachDraftArray(drafts), stakeholders);
-}
-
-export function getPathToRoot(personId: PersonId, orgChart: OrgChart): Person[] {
-  const normalized = normalizeOrgChart(orgChart);
-  const peopleMap = normalized.peopleMap ?? {};
-  const path: Person[] = [];
-  const visited = new Set<PersonId>();
-  let currentId: PersonId | null = personId;
-
-  while (currentId) {
-    if (visited.has(currentId)) {
-      throw new Error(`Cycle detected while walking management chain at ${currentId}`);
-    }
-
-    visited.add(currentId);
-    const person = peopleMap[currentId];
-    if (!person) {
-      break;
-    }
-
-    path.push(person);
-    currentId = person.reportsTo;
-  }
-
-  return path;
-}
-
-export async function runStakeholderAgent(input: {
-  orgChart?: LoadableOrgChart;
-  productContext: ProductContext;
-  options?: StakeholderAgentOptions;
-}): Promise<StakeholderAgentResult> {
-  const orgChart = loadOrgChart(input.orgChart ?? "example.json");
-  const model = input.options?.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_GPT_MODEL;
-  const trace: AgentTraceStep[] = [];
-
-  const researchPlan = await planResearch(orgChart, input.productContext, input.options);
+  const candidates = rankContactCandidates(people, context).slice(0, candidateLimit);
   trace.push({
-    step: "planResearch",
-    why: "A human seller starts by deciding what evidence would change the contact strategy.",
-    outputSummary: `${researchPlan.searchQueries.length} search queries and ${researchPlan.roleHypotheses.length} role hypotheses.`
+    step: "rankContactCandidates",
+    tool: "local",
+    outputSummary: `Prepared ${candidates.length} candidate contacts from ${people.length} people.`
   });
 
-  const researchReport = await conductCompanyResearch(orgChart, input.productContext, researchPlan, input.options);
+  const researchPlan = await planTargetResearch(input, context, candidates, options);
   trace.push({
-    step: "conductCompanyResearch",
-    why: "Public account evidence grounds the buying committee in current priorities, not just titles.",
-    outputSummary: `${researchReport.sources.length} sources and ${researchReport.recommendedAngles.length} recommended angles.`
+    step: "planTargetResearch",
+    tool: "openai",
+    outputSummary: `${researchPlan.searchQueries.length} search queries and ${researchPlan.evidenceNeeded.length} evidence targets.`
   });
 
-  const classified = await classifyStakeholders(orgChart, input.productContext, input.options, researchReport);
+  const researchReport = await conductTargetResearch(input, context, researchPlan, candidates, options);
   trace.push({
-    step: "classifyStakeholders",
-    why: "The agent maps researched account signals back to the org chart and management paths.",
-    outputSummary: `${classified.primaryBuyers.length} primary buyers, ${classified.influencers.length} influencers, ${classified.executiveApprovers.length} approvers.`
+    step: "conductTargetResearch",
+    tool: "openai",
+    outputSummary: `${researchReport.stakeholderSignals.length} stakeholder signals from ${researchReport.sources.length} sources.`
   });
 
-  const outreachDrafts = await draftOutreach(classified.primaryBuyers, input.productContext, researchReport, input.options);
+  const selectedContacts = await selectContactTargets(candidates, context, researchReport, { ...options, topN });
   trace.push({
-    step: "draftOutreach",
-    why: "A human researcher turns the stakeholder decision into a concrete next action.",
-    outputSummary: `${outreachDrafts.length} first-touch email drafts.`
+    step: "selectContactTargets",
+    tool: "openai",
+    outputSummary: `Selected ${selectedContacts.length} researched contacts before email lookup.`
+  });
+
+  const emailLookup = await runEmailFinderForPeople(selectedContacts, options);
+  trace.push({
+    step: "findCompanyEmails",
+    tool: "hunter",
+    outputSummary: `Looked up ${emailLookup.summary.total} selected contacts; found ${emailLookup.summary.found} emails.`
+  });
+
+  const enrichedJson = addSelectedContactsToPeopleInput(input, selectedContacts, emailLookup, researchPlan, researchReport);
+  trace.push({
+    step: "writeEnrichedJson",
+    tool: "local",
+    outputSummary: "Added contact selection metadata and Hunter emails to selected people only."
   });
 
   return {
-    ...classified,
-    productContext: input.productContext,
-    agentMode: "research-agent",
-    model,
+    contactContext: context,
     researchPlan,
     researchReport,
-    outreachDrafts,
+    selectedContacts,
+    emailLookup,
+    enrichedJson,
     trace
   };
 }
 
-async function callOpenAIJson<T>(input: OpenAICallInput): Promise<T> {
-  const apiKey = input.options.apiKey ?? getEnvValue("OPENAI_API_KEY");
+export async function planTargetResearch(
+  input: unknown,
+  context: ContactContext,
+  candidates: SelectedContact[],
+  options: ContactAgentOptions = {}
+): Promise<ResearchPlan> {
+  const apiKey = options.openaiApiKey ?? getEnvValue("OPENAI_API_KEY");
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is required. Add it to .env or export it in your shell.");
+    return fallbackResearchPlan(input, context);
   }
 
-  const model = input.options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_GPT_MODEL;
-  const requestBody: Record<string, unknown> = {
-    model,
-    max_output_tokens: input.maxOutputTokens ?? 6000,
+  try {
+    const model = options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_SELECTOR_MODEL;
+    const response = await callOpenAIJson<Partial<ResearchPlan>>({
+      apiKey,
+      model,
+      fetchImpl: options.fetchImpl,
+      maxOutputTokens: 1600,
+      payload: {
+        task: "Plan web research before choosing sales contacts.",
+        contactContext: context,
+        company: asRecord(input)?.company,
+        candidateSample: candidates.slice(0, 12).map(toResearchCandidate),
+        instructions:
+          "Return researchQuestions, searchQueries, and evidenceNeeded. Focus on evidence a human GTM researcher would gather before deciding who to contact. Queries should target company engineering priorities, product/platform initiatives, relevant leadership, and competitor/tooling context."
+      }
+    });
+
+    return sanitizeResearchPlan(response, input, context);
+  } catch {
+    return fallbackResearchPlan(input, context);
+  }
+}
+
+export async function conductTargetResearch(
+  input: unknown,
+  context: ContactContext,
+  researchPlan: ResearchPlan,
+  candidates: SelectedContact[],
+  options: ContactAgentOptions = {}
+): Promise<ResearchReport> {
+  const apiKey = options.openaiApiKey ?? getEnvValue("OPENAI_API_KEY");
+  if (!apiKey) {
+    return fallbackResearchReport();
+  }
+
+  try {
+    const model = options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_SELECTOR_MODEL;
+    const response = await callOpenAIJson<Partial<ResearchReport>>({
+      apiKey,
+      model,
+      fetchImpl: options.fetchImpl,
+      useWebSearch: true,
+      maxOutputTokens: 4200,
+      payload: {
+        task: "Use web search to research the target company before selecting contacts.",
+        contactContext: context,
+        company: asRecord(input)?.company,
+        researchPlan,
+        candidateSample: candidates.slice(0, 20).map(toResearchCandidate),
+        instructions:
+          "Search the web for current public evidence about the target company's priorities, engineering/product/platform initiatives, relevant teams, and competitor/tooling context. Return companySignals, productFitSignals, competitorSignals, stakeholderSignals, recommendedContactAngles, and sources. Map evidence to relevant roles and named candidates when possible. Do not invent private facts."
+      }
+    });
+
+    return sanitizeResearchReport(response);
+  } catch {
+    return fallbackResearchReport();
+  }
+}
+
+export async function runEmailFinderForPeople(
+  people: NormalizedPerson[],
+  options: ContactAgentOptions = {}
+): Promise<EmailFinderResult> {
+  const results: EmailFinderResultItem[] = [];
+
+  for (const person of people) {
+    results.push(await findCompanyEmail(person, options));
+  }
+
+  return {
+    results,
+    summary: summarizeResults(results)
+  };
+}
+
+export async function findCompanyEmail(
+  person: NormalizedPerson,
+  options: ContactAgentOptions = {}
+): Promise<EmailFinderResultItem> {
+  const apiKey = options.hunterApiKey ?? getEnvValue("HUNTER_API_KEY");
+  const baseResult = createBaseResult(person);
+
+  if (!apiKey) {
+    return {
+      ...baseResult,
+      status: "error",
+      confidence: "low",
+      matchMethod: "email_finder",
+      notes: ["Missing HUNTER_API_KEY in environment or .env."]
+    };
+  }
+
+  if (!person.companyDomain || !person.firstName || !person.lastName) {
+    return {
+      ...baseResult,
+      status: "not_found",
+      confidence: "low",
+      matchMethod: "email_finder",
+      notes: ["Hunter Email Finder requires company domain, first name, and last name."]
+    };
+  }
+
+  try {
+    const hunterResult = await callHunterEmailFinder(person, apiKey, options.fetchImpl);
+    const emailResult = extractHunterWorkEmail(hunterResult, person.companyDomain);
+    if (!emailResult) {
+      return {
+        ...baseResult,
+        status: "not_found",
+        confidence: "low",
+        matchMethod: "email_finder",
+        notes: ["Hunter did not return a work email for this person."]
+      };
+    }
+
+    return {
+      ...baseResult,
+      email: emailResult.email,
+      status: "found",
+      confidence: confidenceFromHunter(hunterResult),
+      matchMethod: "email_finder",
+      notes: emailResult.notes
+    };
+  } catch (error) {
+    if (isHunterNotFoundError(error)) {
+      return {
+        ...baseResult,
+        status: "not_found",
+        confidence: "low",
+        matchMethod: "email_finder",
+        notes: ["Hunter did not find an email for this person."]
+      };
+    }
+
+    return {
+      ...baseResult,
+      status: "error",
+      confidence: "low",
+      matchMethod: "email_finder",
+      notes: [error instanceof Error ? error.message : "Unknown Hunter lookup error."]
+    };
+  }
+}
+
+export function addSelectedContactsToPeopleInput(
+  input: unknown,
+  selectedContacts: SelectedContact[],
+  emailLookup: EmailFinderResult,
+  researchPlan?: ResearchPlan,
+  researchReport?: ResearchReport
+): unknown {
+  const cloned = structuredCloneJson(input);
+  const root = asRecord(cloned);
+  const people = getPeopleArray(cloned) ?? [];
+
+  const emailByInputId = new Map(emailLookup.results.map((result) => [result.inputId, result]));
+  const selectedPeople: UnknownRecord[] = [];
+  for (const contact of selectedContacts) {
+    const index = findInputPersonIndex(people, contact.inputId);
+    const originalPerson = index === -1 ? undefined : asRecord(people[index]);
+    const person = originalPerson
+      ? (structuredCloneJson(originalPerson) as UnknownRecord)
+      : createPersonRecordFromContact(contact);
+    const emailResult = emailByInputId.get(contact.inputId);
+    if (person) {
+      person["contactPriority"] = contact.contactPriority;
+      person["contactScore"] = contact.contactScore;
+      person["contactReasons"] = contact.contactReasons;
+      if (contact.evidenceUrls && contact.evidenceUrls.length > 0) {
+        person["contactEvidenceUrls"] = contact.evidenceUrls;
+      }
+      person["email"] = emailResult?.email ?? null;
+      person["emailStatus"] = emailResult?.status ?? "not_found";
+      selectedPeople.push(person);
+    }
+  }
+
+  return {
+    company: getCompanyRecord(root, selectedContacts),
+    selectedContacts: selectedPeople,
+    contactAgent: {
+      selectedContactIds: selectedContacts.map((contact) => contact.inputId),
+      emailSummary: emailLookup.summary,
+      research: {
+        questions: researchPlan?.researchQuestions ?? [],
+        searchQueries: researchPlan?.searchQueries ?? [],
+        signals: [
+          ...(researchReport?.companySignals ?? []),
+          ...(researchReport?.productFitSignals ?? []),
+          ...(researchReport?.competitorSignals ?? [])
+        ].slice(0, 12),
+        sources: researchReport?.sources ?? []
+      }
+    }
+  };
+}
+
+export function addEmailsToPeopleInput(input: unknown, result: EmailFinderResult): unknown {
+  const cloned = structuredCloneJson(input);
+  const people = getPeopleArray(cloned);
+  if (!people) {
+    return cloned;
+  }
+
+  for (const item of result.results) {
+    const index = findInputPersonIndex(people, item.inputId);
+    if (index === -1) {
+      continue;
+    }
+
+    const person = asRecord(people[index]);
+    if (person) {
+      person["email"] = item.email ?? null;
+    }
+  }
+
+  return cloned;
+}
+
+export function rankContactCandidates(people: NormalizedPerson[], context: ContactContext = {}): SelectedContact[] {
+  return people
+    .map((person) => {
+      const scoring = scoreCandidate(person, context);
+      return {
+        ...person,
+        contactPriority: 0,
+        contactScore: scoring.score,
+        contactReasons: scoring.reasons
+      };
+    })
+    .filter((person) => person.contactScore > 0)
+    .sort((a, b) => b.contactScore - a.contactScore || compareOptionalNumber(a.seniorityRank, b.seniorityRank))
+    .map((person, index) => ({
+      ...person,
+      contactPriority: index + 1
+    }));
+}
+
+function fallbackResearchPlan(input: unknown, context: ContactContext): ResearchPlan {
+  const company = asRecord(asRecord(input)?.company);
+  const targetCompany = context.targetCompany ?? readString(company, ["name", "companyName", "organizationName"]) ?? "target company";
+  const productCategory = context.productCategory ?? "the product category";
+  const competitor = context.competitor ?? "the current alternative";
+
+  return {
+    researchQuestions: [
+      `What public priorities does ${targetCompany} have related to ${productCategory}?`,
+      `Which teams or leaders at ${targetCompany} likely own ${productCategory} decisions?`,
+      `What signals show ${targetCompany} might compare the seller against ${competitor}?`
+    ],
+    searchQueries: [
+      `${targetCompany} ${productCategory} engineering priorities`,
+      `${targetCompany} platform engineering developer experience infrastructure`,
+      `${targetCompany} ${competitor} frontend deployment hosting`
+    ],
+    evidenceNeeded: [
+      "Current public initiatives related to product fit.",
+      "Roles or teams likely to own the buying decision.",
+      "Named leaders connected to engineering, platform, developer experience, infrastructure, or web systems."
+    ]
+  };
+}
+
+function sanitizeResearchPlan(plan: Partial<ResearchPlan>, input: unknown, context: ContactContext): ResearchPlan {
+  const fallback = fallbackResearchPlan(input, context);
+  const researchQuestions = sanitizeStringArray(plan.researchQuestions).slice(0, 8);
+  const searchQueries = sanitizeStringArray(plan.searchQueries).slice(0, 8);
+  const evidenceNeeded = sanitizeStringArray(plan.evidenceNeeded).slice(0, 8);
+
+  return {
+    researchQuestions: researchQuestions.length > 0 ? researchQuestions : fallback.researchQuestions,
+    searchQueries: searchQueries.length > 0 ? searchQueries : fallback.searchQueries,
+    evidenceNeeded: evidenceNeeded.length > 0 ? evidenceNeeded : fallback.evidenceNeeded
+  };
+}
+
+function fallbackResearchReport(): ResearchReport {
+  return {
+    companySignals: [],
+    productFitSignals: [],
+    competitorSignals: [],
+    stakeholderSignals: [],
+    recommendedContactAngles: [],
+    sources: []
+  };
+}
+
+function sanitizeResearchReport(report: Partial<ResearchReport>): ResearchReport {
+  const stakeholderSignals = Array.isArray(report.stakeholderSignals)
+    ? report.stakeholderSignals
+        .map((rawSignal) => {
+          const signal = asRecord(rawSignal);
+          if (!signal) {
+            return undefined;
+          }
+
+          return {
+            topic: sanitizeString(signal.topic),
+            evidence: sanitizeString(signal.evidence),
+            sourceUrl: sanitizeString(signal.sourceUrl) || undefined,
+            relevantRoles: sanitizeStringArray(signal.relevantRoles),
+            relevantPeople: sanitizeStringArray(signal.relevantPeople)
+          };
+        })
+        .filter(
+          (signal): signal is ResearchSignal =>
+            Boolean(signal?.topic || signal?.evidence || signal?.relevantRoles.length || signal?.relevantPeople?.length)
+        )
+        .slice(0, 12)
+    : [];
+
+  const sources = Array.isArray(report.sources)
+    ? report.sources
+        .map((rawSource) => {
+          const source = asRecord(rawSource);
+          if (!source) {
+            return undefined;
+          }
+
+          return {
+            title: sanitizeString(source.title) || sanitizeString(source.url),
+            url: sanitizeString(source.url)
+          };
+        })
+        .filter((source): source is { title: string; url: string } => Boolean(source?.url))
+        .slice(0, 12)
+    : [];
+
+  return {
+    companySignals: sanitizeStringArray(report.companySignals).slice(0, 12),
+    productFitSignals: sanitizeStringArray(report.productFitSignals).slice(0, 12),
+    competitorSignals: sanitizeStringArray(report.competitorSignals).slice(0, 12),
+    stakeholderSignals,
+    recommendedContactAngles: sanitizeStringArray(report.recommendedContactAngles).slice(0, 8),
+    sources
+  };
+}
+
+function toResearchCandidate(candidate: SelectedContact): UnknownRecord {
+  return {
+    inputId: candidate.inputId,
+    fullName: candidate.fullName,
+    title: candidate.title,
+    department: candidate.department,
+    valueTier: candidate.valueTier,
+    influence: candidate.influence,
+    seniority: candidate.seniority,
+    reportSpan: candidate.reportSpan,
+    directReports: candidate.directReports,
+    reportsTo: candidate.reportsTo,
+    localScore: candidate.contactScore,
+    localReasons: candidate.contactReasons
+  };
+}
+
+function chooseRealisticContacts(candidates: SelectedContact[], topN: number, reason: string): SelectedContact[] {
+  return finalizeSelectedContacts([], candidates, topN).map((candidate) => ({
+    ...candidate,
+    contactReasons: [...candidate.contactReasons, reason].slice(0, 5)
+  }));
+}
+
+function finalizeSelectedContacts(
+  selected: SelectedContact[],
+  candidates: SelectedContact[],
+  topN: number
+): SelectedContact[] {
+  const hasRealisticAlternatives = candidates.some(isRealisticFirstContact);
+  const selectedIds = new Set<string>();
+  const finalized: SelectedContact[] = [];
+
+  for (const contact of selected) {
+    if (!contact.inputId || selectedIds.has(contact.inputId)) {
+      continue;
+    }
+    if (hasRealisticAlternatives && !isRealisticFirstContact(contact)) {
+      continue;
+    }
+
+    finalized.push(contact);
+    selectedIds.add(contact.inputId);
+    if (finalized.length >= topN) {
+      break;
+    }
+  }
+
+  const fillCandidates = [
+    ...candidates.filter((candidate) => isRealisticFirstContact(candidate)),
+    ...candidates
+  ];
+  for (const candidate of fillCandidates) {
+    if (!candidate.inputId || selectedIds.has(candidate.inputId)) {
+      continue;
+    }
+
+    finalized.push(candidate);
+    selectedIds.add(candidate.inputId);
+    if (finalized.length >= topN) {
+      break;
+    }
+  }
+
+  return finalized.slice(0, topN).map((contact, index) => ({
+    ...contact,
+    contactPriority: index + 1
+  }));
+}
+
+function isRealisticFirstContact(person: NormalizedPerson): boolean {
+  return !isUnrealisticFirstContact(person) && !isSupportRole(person);
+}
+
+function isUnrealisticFirstContact(person: NormalizedPerson): boolean {
+  const text = normalizePersonText(person);
+  return /\bceo\b|\bchief executive\b|\bfounder\b|\bco-founder\b|\bpresident\b|\bboard\b|\bchairman\b|\bchairwoman\b/.test(text);
+}
+
+function isSupportRole(person: NormalizedPerson): boolean {
+  return /\bassistant\b|\bexecutive business partner\b|\bchief of staff\b|\badmin\b|\bcoordinator\b/.test(normalizePersonText(person));
+}
+
+function normalizePersonText(person: NormalizedPerson): string {
+  return normalizeForCompare(
+    [
+      person.fullName,
+      person.title,
+      person.department,
+      person.seniority,
+      person.valueTier,
+      person.influence,
+      ...(person.teams ?? [])
+    ].join(" ")
+  );
+}
+
+async function selectContactTargets(
+  candidates: SelectedContact[],
+  context: ContactContext,
+  researchReport: ResearchReport,
+  options: ContactAgentOptions
+): Promise<SelectedContact[]> {
+  const apiKey = options.openaiApiKey ?? getEnvValue("OPENAI_API_KEY");
+  const topN = options.topN ?? 3;
+  if (!apiKey) {
+    return chooseRealisticContacts(candidates, topN, "Fallback selection because OPENAI_API_KEY is missing.");
+  }
+
+  try {
+    const model = options.model ?? getEnvValue("OPENAI_MODEL") ?? DEFAULT_SELECTOR_MODEL;
+      const response = await callOpenAIJson<{
+      selectedContacts?: Array<{
+        inputId?: string;
+        fullName?: string;
+        contactScore?: number;
+        contactReasons?: string[];
+        evidenceUrls?: string[];
+      }>;
+    }>({
+      apiKey,
+      model,
+      fetchImpl: options.fetchImpl,
+      payload: {
+        task:
+          "Select the top people to contact before any email lookup. Choose exactly the best contacts from the provided candidates using the research evidence.",
+        contactContext: context,
+        researchReport,
+        topN,
+        candidates: candidates.map(toResearchCandidate),
+        instructions:
+          "Return JSON with selectedContacts only. Pick people likely to own or influence buying decisions based on current public research, product fit, org role, authority, and accessibility. Prefer reachable operators such as VP, Head, Director, senior manager, or principal leads for platform engineering, infrastructure, DevEx, cloud, web, or frontend systems. Do not pick CEOs, founders, presidents, board members, assistants, chiefs of staff, or generic team roster entries when realistic operator contacts exist. Each selected contact must include inputId, fullName, contactScore, 1-3 contactReasons, and evidenceUrls when a source supports the pick."
+      }
+    });
+
+    const selectedIds = new Set<string>();
+    const selected = (response.selectedContacts ?? [])
+      .map((selection) => {
+        const matched = candidates.find(
+          (candidate) =>
+            candidate.inputId === selection.inputId ||
+            normalizeForCompare(candidate.fullName) === normalizeForCompare(selection.fullName ?? "")
+        );
+        if (!matched || !matched.inputId || selectedIds.has(matched.inputId)) {
+          return undefined;
+        }
+
+        selectedIds.add(matched.inputId);
+        return {
+          ...matched,
+          contactScore: clampScore(selection.contactScore ?? matched.contactScore),
+          contactReasons:
+            sanitizeStringArray(selection.contactReasons).length > 0
+              ? sanitizeStringArray(selection.contactReasons)
+              : matched.contactReasons,
+          evidenceUrls: sanitizeStringArray(selection.evidenceUrls)
+        };
+      })
+      .filter((contact): contact is SelectedContact => Boolean(contact))
+      .slice(0, topN);
+
+    if (selected.length > 0) {
+      return finalizeSelectedContacts(selected, candidates, topN);
+    }
+  } catch {
+    // Fall back to local ranking. The email lookup can still proceed.
+  }
+
+  return chooseRealisticContacts(candidates, topN, "Fallback selection after selector model failed.");
+}
+
+async function callOpenAIJson<T>(input: {
+  apiKey: string;
+  model: string;
+  payload: unknown;
+  fetchImpl?: typeof fetch;
+  useWebSearch?: boolean;
+  maxOutputTokens?: number;
+}): Promise<T> {
+  const requestBody: UnknownRecord = {
+    model: input.model,
+    max_output_tokens: input.maxOutputTokens ?? 2200,
     input: [
       {
         role: "system",
-        content: input.systemPrompt ?? STAKEHOLDER_AGENT_SYSTEM_PROMPT
+        content:
+          "You are a careful GTM research and contact selection agent. Use tools when provided, avoid private or invented facts, and return only valid JSON."
       },
       {
         role: "user",
-        content: JSON.stringify({
-          task: input.task,
-          ...input.payload
-        })
+        content: JSON.stringify(input.payload)
       }
     ]
   };
 
   if (input.useWebSearch) {
-    requestBody.tools = [{ type: "web_search" }];
-    requestBody.tool_choice = "auto";
-    requestBody.include = ["web_search_call.action.sources"];
+    requestBody["tools"] = [{ type: "web_search" }];
+    requestBody["tool_choice"] = "auto";
   }
 
-  if (model.startsWith("gpt-5")) {
-    requestBody.reasoning = { effort: input.useWebSearch ? "low" : "minimal" };
-    requestBody.text = { verbosity: "low" };
+  if (input.model.startsWith("gpt-5")) {
+    requestBody["reasoning"] = { effort: input.useWebSearch ? "low" : "minimal" };
+    requestBody["text"] = { verbosity: "low" };
   }
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await (input.fetchImpl ?? fetch)(OPENAI_RESPONSES_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      authorization: `Bearer ${input.apiKey}`,
+      "content-type": "application/json"
     },
     body: JSON.stringify(requestBody)
   });
 
-  const json = (await response.json()) as OpenAIResponse;
+  const text = await response.text();
+  const json = text ? (JSON.parse(text) as OpenAIResponse) : {};
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${json.error?.message ?? response.statusText}`);
+    throw new Error(`OpenAI API error ${response.status}: ${json.error?.message ?? response.statusText}`);
   }
 
-  return parseJsonObject(extractResponseText(json)) as T;
+  return parseJsonObject(extractOpenAIText(json)) as T;
 }
 
-function normalizeOrgChart(orgChart: OrgChart): OrgChart {
-  const people = orgChart.people ?? Object.values(orgChart.peopleMap ?? {});
-  const peopleMap = orgChart.peopleMap ?? Object.fromEntries(people.map((person) => [person.id, person]));
-  const childrenMap = orgChart.childrenMap ?? buildChildrenMap(people);
-  const rootId = orgChart.rootId ?? findRootId(people);
-
-  return {
-    rootId,
-    people: Object.values(peopleMap).sort(byOrgPosition),
-    peopleMap,
-    childrenMap
-  };
-}
-
-function buildChildrenMap(people: Person[]): Record<PersonId, PersonId[]> {
-  const childrenMap: Record<PersonId, PersonId[]> = {};
-
-  for (const person of people) {
-    childrenMap[person.id] ??= [];
-    if (person.reportsTo) {
-      childrenMap[person.reportsTo] ??= [];
-      childrenMap[person.reportsTo].push(person.id);
-    }
-  }
-
-  for (const children of Object.values(childrenMap)) {
-    children.sort();
-  }
-
-  return childrenMap;
-}
-
-function findRootId(people: Person[]): PersonId | undefined {
-  return people.find((person) => person.reportsTo === null)?.id;
-}
-
-function summarizeOrgForPrompt(people: Person[]): Person[] {
-  return people.filter((person) => person.level <= 4);
-}
-
-function sanitizeStakeholderAgentResult(
-  result: Partial<StakeholderAgentResult>,
-  context: ProductContext,
-  model: string,
-  orgChart: OrgChart,
-  researchPlan: ResearchPlan,
-  researchReport: ResearchReport,
-  outreachDrafts: OutreachDraft[]
-): StakeholderAgentResult {
-  result = unwrapStakeholderAgentResult(result);
-  const normalized = normalizeOrgChart(orgChart);
-  const peopleMap = normalized.peopleMap ?? {};
-  const scoreById = new Map<PersonId, Pick<Stakeholder, "score" | "matchedKeywords" | "reasons">>();
-  const returnedStakeholders = [
-    ...(result.primaryBuyers ?? []),
-    ...(result.influencers ?? []),
-    ...(result.executiveApprovers ?? []),
-    ...(result.pathToDecisionMaker ?? [])
-  ];
-
-  for (const stakeholder of returnedStakeholders) {
-    if (!stakeholder?.id) {
-      continue;
-    }
-
-    const existing = scoreById.get(stakeholder.id);
-    const nextScore = clampScore(stakeholder.score ?? 0);
-    if (existing && existing.score > nextScore) {
-      continue;
-    }
-
-    scoreById.set(stakeholder.id, {
-      score: stakeholder.score ?? 0,
-      matchedKeywords: Array.isArray(stakeholder.matchedKeywords) ? stakeholder.matchedKeywords : [],
-      reasons: Array.isArray(stakeholder.reasons) ? stakeholder.reasons : []
-    });
-  }
-
-  const primaryBuyers = sanitizeStakeholders(result.primaryBuyers, peopleMap, scoreById);
-  const influencers = sanitizeStakeholders(result.influencers, peopleMap, scoreById);
-  const executiveApprovers = sanitizeStakeholders(result.executiveApprovers, peopleMap, scoreById);
-  const pathToDecisionMaker = sanitizePathToDecisionMaker(
-    result.pathToDecisionMaker,
-    primaryBuyers,
-    peopleMap,
-    scoreById,
-    normalized
-  );
-
-  return {
-    productContext: context,
-    agentMode: "research-agent",
-    model,
-    researchPlan,
-    researchReport,
-    primaryBuyers,
-    influencers,
-    executiveApprovers,
-    pathToDecisionMaker,
-    outreachDrafts,
-    summary: typeof result.summary === "string" ? result.summary : "",
-    reasoning: {
-      scoringPriorities: sanitizeStringArray(result.reasoning?.scoringPriorities),
-      primaryBuyerCriteria: sanitizeString(result.reasoning?.primaryBuyerCriteria),
-      influencerCriteria: sanitizeString(result.reasoning?.influencerCriteria),
-      executiveApproverCriteria: sanitizeString(result.reasoning?.executiveApproverCriteria)
-    },
-    trace: []
-  };
-}
-
-function sanitizePathToDecisionMaker(
-  path: Stakeholder[] | undefined,
-  primaryBuyers: Stakeholder[],
-  peopleMap: Record<PersonId, Person>,
-  scoreById: Map<PersonId, Pick<Stakeholder, "score" | "matchedKeywords" | "reasons">>,
-  orgChart: OrgChart
-): Stakeholder[] {
-  const sanitizedPath = sanitizeStakeholders(path, peopleMap, scoreById);
-  if (sanitizedPath.length >= 2 && isValidReportsToChain(sanitizedPath)) {
-    return sanitizedPath;
-  }
-
-  const anchor = primaryBuyers[0];
-  if (!anchor) {
-    return sanitizedPath;
-  }
-
-  return getPathToRoot(anchor.id, orgChart).map((person) => {
-    const scoreData = scoreById.get(person.id);
-    return {
-      ...person,
-      score: clampScore(scoreData?.score ?? 0),
-      matchedKeywords: sanitizeStringArray(scoreData?.matchedKeywords),
-      reasons: sanitizeStringArray(scoreData?.reasons)
-    };
+async function callHunterEmailFinder(
+  person: NormalizedPerson,
+  apiKey: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<HunterEmailFinderResponse> {
+  const params = new URLSearchParams({
+    domain: person.companyDomain ?? "",
+    first_name: person.firstName ?? "",
+    last_name: person.lastName ?? "",
+    api_key: apiKey
   });
-}
 
-function isValidReportsToChain(path: Stakeholder[]): boolean {
-  return path.every((person, index) => {
-    const nextPerson = path[index + 1];
-    return !nextPerson || person.reportsTo === nextPerson.id;
+  const response = await fetchImpl(`${HUNTER_EMAIL_FINDER_URL}?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      accept: "application/json"
+    }
   });
-}
 
-function unwrapStakeholderAgentResult(result: Partial<StakeholderAgentResult>): Partial<StakeholderAgentResult> {
-  const wrapped = result as Partial<StakeholderAgentResult> & {
-    result?: Partial<StakeholderAgentResult>;
-    stakeholderAgentResult?: Partial<StakeholderAgentResult>;
-  };
-
-  return wrapped.result ?? wrapped.stakeholderAgentResult ?? result;
-}
-
-function sanitizeStakeholders(
-  stakeholders: Stakeholder[] | undefined,
-  peopleMap: Record<PersonId, Person>,
-  scoreById: Map<PersonId, Pick<Stakeholder, "score" | "matchedKeywords" | "reasons">>
-): Stakeholder[] {
-  if (!Array.isArray(stakeholders)) {
-    return [];
+  const text = await response.text();
+  const json = text ? (JSON.parse(text) as HunterEmailFinderResponse) : {};
+  if (!response.ok) {
+    const detail = json.errors?.map((error) => error.details || error.id).filter(Boolean).join("; ");
+    throw new Error(`Hunter API error ${response.status}: ${detail || response.statusText}`);
   }
 
-  return stakeholders
-    .map((stakeholder) => {
-      const person = peopleMap[stakeholder.id];
-      if (!person) {
-        return undefined;
-      }
-
-      const scoreData = scoreById.get(stakeholder.id);
-      return {
-        ...person,
-        score: clampScore(stakeholder.score ?? scoreData?.score ?? 0),
-        matchedKeywords: sanitizeStringArray(stakeholder.matchedKeywords ?? scoreData?.matchedKeywords),
-        reasons: sanitizeStringArray(stakeholder.reasons ?? scoreData?.reasons)
-      };
-    })
-    .filter((stakeholder): stakeholder is Stakeholder => Boolean(stakeholder));
+  return json;
 }
 
-function sanitizeResearchPlan(plan: Partial<ResearchPlan>, context: ProductContext): ResearchPlan {
-  return {
-    researchQuestions: sanitizeStringArray(plan.researchQuestions).slice(0, 8),
-    searchQueries: sanitizeStringArray(plan.searchQueries).slice(0, 8),
-    roleHypotheses: sanitizeStringArray(plan.roleHypotheses).slice(0, 8),
-    evidenceNeeded:
-      sanitizeStringArray(plan.evidenceNeeded).slice(0, 8).length > 0
-        ? sanitizeStringArray(plan.evidenceNeeded).slice(0, 8)
-        : [
-            `${context.targetCompany} engineering priorities`,
-            `${context.productCategory} ownership signals`,
-            `${context.competitor ?? "incumbent"} replacement risks`
-          ]
-  };
-}
-
-function sanitizeResearchReport(report: Partial<ResearchReport>): ResearchReport {
-  const sources = sanitizeResearchSources(report.sources);
-  const companySignals = sanitizeStringArray(report.companySignals);
-  const productFitSignals = sanitizeStringArray(report.productFitSignals);
-  const competitorSignals = sanitizeStringArray(report.competitorSignals);
-
-  return {
-    companySignals:
-      companySignals.length > 0
-        ? companySignals
-        : sources.slice(0, 3).map((source) => `Found public account evidence from ${source.title}.`),
-    productFitSignals:
-      productFitSignals.length > 0
-        ? productFitSignals
-        : sources.slice(0, 3).map((source) => `Source may inform frontend hosting/deployment fit: ${source.title}.`),
-    competitorSignals,
-    stakeholderSignals: Array.isArray(report.stakeholderSignals)
-      ? report.stakeholderSignals.map((signal) => ({
-          personId: typeof signal.personId === "string" ? signal.personId : undefined,
-          roleOrTeam: sanitizeString(signal.roleOrTeam),
-          signal: sanitizeString(signal.signal),
-          sourceUrls: sanitizeStringArray(signal.sourceUrls)
-        })).filter((signal) => signal.roleOrTeam || signal.signal || signal.sourceUrls.length > 0)
-      : [],
-    recommendedAngles: sanitizeStringArray(report.recommendedAngles),
-    sources
-  };
-}
-
-function sanitizeResearchSources(sources: ResearchSource[] | undefined): ResearchSource[] {
-  if (!Array.isArray(sources)) {
-    return [];
-  }
-
-  return sources
-    .map((source) => ({
-      title: sanitizeString(source.title),
-      url: sanitizeString(source.url),
-      relevance: sanitizeString(source.relevance)
-    }))
-    .filter((source) => source.url);
-}
-
-function extractOutreachDraftArray(value: unknown): unknown[] | undefined {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  if (!value || typeof value !== "object") {
+function normalizePerson(
+  rawPerson: unknown,
+  index: number,
+  defaultCompanyName?: string,
+  defaultCompanyDomain?: string
+): NormalizedPerson | undefined {
+  const person = asRecord(rawPerson);
+  if (!person) {
     return undefined;
   }
 
-  const record = value as Record<string, unknown>;
-  const candidates = [
-    record.outreachDrafts,
-    record.drafts,
-    record.emails,
-    record.outreach,
-    record.results,
-    record.messages
+  const company = asRecord(person.company) ?? asRecord(person.organization);
+  const fullName = readString(person, ["fullName", "name", "personName"]);
+  const firstName = readString(person, ["firstName", "first_name"]);
+  const lastName = readString(person, ["lastName", "last_name"]);
+  const composedName = [firstName, lastName].filter(Boolean).join(" ");
+  const normalizedName = fullName || composedName;
+  const companyName =
+    readString(person, ["companyName", "organizationName", "organization"]) ||
+    readString(company, ["name", "companyName", "organizationName"]) ||
+    defaultCompanyName;
+  const companyDomain =
+    normalizeCompanyDomainValue(readString(person, ["companyDomain", "domain", "organizationDomain"])) ||
+    normalizeCompanyDomainValue(readString(company, ["domain", "companyDomain", "primaryDomain", "website"])) ||
+    defaultCompanyDomain;
+
+  if (!normalizedName || !companyName) {
+    return undefined;
+  }
+
+  const nameParts = splitName(normalizedName);
+  return {
+    inputId: readString(person, ["inputId", "id", "personId"]) ?? String(index),
+    firstName: firstName ?? nameParts.firstName,
+    lastName: lastName ?? nameParts.lastName,
+    fullName: normalizedName,
+    title: readString(person, ["title", "role", "jobTitle"]) ?? undefined,
+    department: readString(person, ["department"]),
+    companyName,
+    companyDomain,
+    linkedinUrl: readString(person, ["linkedinUrl", "linkedin_url", "linkedInUrl"]),
+    valueTier: readString(person, ["valueTier"]),
+    influence: readString(person, ["influence"]),
+    seniority: readString(person, ["seniority"]),
+    seniorityRank: readNumber(person, ["seniorityRank"]),
+    reportSpan: readNumber(person, ["reportSpan"]),
+    directReports: readNumber(person, ["directReports"]),
+    reportsTo: readString(person, ["reportsTo"]) ?? null,
+    level: readNumber(person, ["level"]) ?? null,
+    teams: Array.isArray(person.teams) ? person.teams.filter((team): team is string => typeof team === "string") : undefined
+  };
+}
+
+function scoreCandidate(person: NormalizedPerson, context: ContactContext): { score: number; reasons: string[] } {
+  const text = normalizePersonText(person);
+  const productText = normalizeForCompare([context.productCategory, context.competitor].filter(Boolean).join(" "));
+  const reasons: string[] = [];
+  let score = 0;
+
+  if (person.valueTier === "executive") {
+    score += 14;
+    reasons.push("Executive approver signal, but usually not the first contact.");
+  } else if (person.valueTier === "senior-leader") {
+    score += 28;
+    reasons.push("Senior leader with likely buying influence.");
+  } else if (person.valueTier === "leader") {
+    score += 20;
+    reasons.push("Leader-level role with likely team influence.");
+  }
+
+  if (person.influence === "very-high") {
+    score += isUnrealisticFirstContact(person) ? 4 : 20;
+    reasons.push("Very high influence in source context.");
+  } else if (person.influence === "high") {
+    score += 14;
+    reasons.push("High influence in source context.");
+  } else if (person.influence === "low") {
+    score += 4;
+  }
+
+  if (typeof person.reportSpan === "number" && person.reportSpan > 0) {
+    score += isUnrealisticFirstContact(person) ? Math.min(4, Math.ceil(person.reportSpan / 200)) : Math.min(18, Math.ceil(person.reportSpan / 50));
+    reasons.push(`Reported downstream span of ${person.reportSpan}.`);
+  }
+
+  if (/\bvp\b|\bhead\b|\bdirector\b|\bmanaging director\b|\bsenior manager\b|\bprincipal\b/.test(text)) {
+    score += 18;
+    reasons.push("Title suggests reachable operator authority.");
+  }
+
+  if (/\bchief\b|\bcto\b|\bcio\b|\bciso\b|\bcpo\b|\bcfo\b|\bcoo\b/.test(text)) {
+    score += 6;
+    reasons.push("C-suite signal; better as approver than first outreach.");
+  }
+
+  if (isUnrealisticFirstContact(person)) {
+    score -= 50;
+    reasons.push("Too senior or indirect for realistic first outreach.");
+  }
+
+  if (/\bassistant\b|\bexecutive business partner\b|\bchief of staff\b/.test(text)) {
+    score -= 45;
+    reasons.push("Operational support role; deprioritized for first outreach.");
+  }
+
+  if (productText.includes("frontend") || productText.includes("deployment") || productText.includes("hosting")) {
+    if (/\bengineering\b|\bsoftware\b|\bproduct\b|\binfrastructure\b|\bdeveloper\b/.test(text)) {
+      score += 18;
+      reasons.push("Relevant to frontend/deployment buying context.");
+    }
+    if (/\bfinance\b|\bpolicy\b|\blegal\b|\bcompliance\b/.test(text)) {
+      score -= 5;
+    }
+  }
+
+  if (person.title === undefined && person.valueTier === "team-member") {
+    score -= 25;
+    reasons.push("Team-roster entry lacks title or authority signal.");
+  }
+
+  return {
+    score: clampScore(score),
+    reasons: reasons.slice(0, 4)
+  };
+}
+
+function extractHunterWorkEmail(
+  response: HunterEmailFinderResponse,
+  expectedDomain?: string
+): { email: string; notes: string[] } | undefined {
+  const data = response.data;
+  const email = data?.email?.trim().toLowerCase();
+  if (!email || !isEmail(email)) {
+    return undefined;
+  }
+
+  const emailDomain = email.split("@")[1];
+  if (expectedDomain && !domainsMatch(emailDomain, expectedDomain)) {
+    return undefined;
+  }
+
+  const notes = [
+    `Hunter score: ${typeof data?.score === "number" ? data.score : "unknown"}.`,
+    `Hunter verification status: ${data?.verification?.status ?? "unknown"}.`
   ];
-
-  return candidates.find((candidate): candidate is unknown[] => Array.isArray(candidate));
-}
-
-function sanitizeOutreachDrafts(drafts: unknown[] | undefined, stakeholders: Stakeholder[]): OutreachDraft[] {
-  if (!Array.isArray(drafts)) {
-    return [];
+  if (expectedDomain) {
+    notes.push(`Email domain matched ${expectedDomain}.`);
   }
 
-  const allowedIds = new Set(stakeholders.map((stakeholder) => stakeholder.id));
-  const idByName = new Map(stakeholders.map((stakeholder) => [stakeholder.name, stakeholder.id]));
-  return drafts
-    .map((draft) => ({
-      personId: sanitizeDraftPersonId(draft, idByName),
-      name: sanitizeString(readDraftField(draft, ["name", "recipient", "to"])),
-      subject: sanitizeString(readDraftField(draft, ["subject", "subjectLine"])),
-      email: sanitizeEmailBody(readDraftField(draft, ["email", "body", "emailBody", "message"])),
-      rationale: sanitizeString(readDraftField(draft, ["rationale", "why", "reason"]))
-    }))
-    .filter((draft) => allowedIds.has(draft.personId) && draft.subject && draft.email);
+  return { email, notes };
 }
 
-function sanitizeDraftPersonId(value: unknown, idByName: Map<string, PersonId>): string {
-  const directId = sanitizeString(readDraftField(value, ["personId", "personID", "id", "stakeholderId"]));
-  if (directId) {
-    return directId;
+function confidenceFromHunter(response: HunterEmailFinderResponse): Confidence {
+  const score = response.data?.score ?? 0;
+  const verificationStatus = normalizeForCompare(response.data?.verification?.status ?? "");
+  if (score >= 90 && verificationStatus === "valid") {
+    return "high";
+  }
+  if (score >= 70 || verificationStatus === "valid") {
+    return "medium";
+  }
+  return "low";
+}
+
+function createBaseResult(person: NormalizedPerson): Omit<EmailFinderResultItem, "status" | "confidence" | "matchMethod" | "notes"> {
+  return {
+    inputId: person.inputId,
+    fullName: person.fullName,
+    companyName: person.companyName,
+    companyDomain: person.companyDomain,
+    provider: "hunter"
+  };
+}
+
+function summarizeResults(results: EmailFinderResultItem[]): EmailFinderResult["summary"] {
+  return {
+    total: results.length,
+    found: results.filter((result) => result.status === "found").length,
+    notFound: results.filter((result) => result.status === "not_found").length,
+    ambiguous: results.filter((result) => result.status === "ambiguous").length,
+    errors: results.filter((result) => result.status === "error").length
+  };
+}
+
+function extractOpenAIText(response: OpenAIResponse): string {
+  if (response.output_text) {
+    return response.output_text;
   }
 
-  const name = sanitizeString(readDraftField(value, ["name", "recipient", "to"]));
-  return idByName.get(name) ?? "";
-}
+  const text = response.output
+    ?.flatMap((item) => item.content ?? [])
+    .map((content) => content.text ?? "")
+    .join("")
+    .trim();
 
-function sanitizeEmailBody(value: unknown): string {
-  const text = sanitizeString(value);
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
-    return "";
+  if (!text) {
+    throw new Error("OpenAI response did not contain text output.");
   }
 
   return text;
 }
 
-function readDraftField(value: unknown, fields: string[]): unknown {
-  if (!value || typeof value !== "object") {
+function parseJsonObject(text: string): unknown {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end === -1 || end <= start) {
+      throw new Error("Model response was not valid JSON.");
+    }
+
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
+}
+
+function isHunterNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  return message.includes("404") || message.includes("not found");
+}
+
+function readString(record: UnknownRecord | undefined, keys: string[]): string | undefined {
+  if (!record) {
     return undefined;
   }
 
-  const record = value as Record<string, unknown>;
-  return fields.map((field) => record[field]).find((fieldValue) => fieldValue !== undefined);
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function readNumber(record: UnknownRecord | undefined, keys: string[]): number | undefined {
+  if (!record) {
+    return undefined;
+  }
+
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
 function sanitizeStringArray(value: unknown): string[] {
@@ -775,15 +1125,133 @@ function sanitizeStringArray(value: unknown): string[] {
 }
 
 function sanitizeString(value: unknown): string {
-  if (typeof value === "string") {
-    return value.trim();
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePeopleApiInput(input: unknown, companyDomain: string): unknown {
+  const domain = normalizeCompanyDomainHint(companyDomain);
+  const companyName = titleCaseDomainLabel(companyDomain);
+  const root = asRecord(input);
+  const data = asRecord(root?.data);
+  const people =
+    getPeopleArray(input) ??
+    (Array.isArray(root?.results) ? root.results : undefined) ??
+    (Array.isArray(root?.contacts) ? root.contacts : undefined) ??
+    (Array.isArray(data?.results) ? data.results : undefined) ??
+    (Array.isArray(data?.contacts) ? data.contacts : undefined);
+
+  if (Array.isArray(input)) {
+    return {
+      company: { name: companyName, domain },
+      people: input
+    };
   }
 
-  if (Array.isArray(value)) {
-    return sanitizeStringArray(value).join(" ");
+  if (data && Array.isArray(people)) {
+    const apiCompany = asRecord(data.company);
+    return {
+      ...data,
+      company: {
+        ...(apiCompany ?? {}),
+        name: readString(apiCompany, ["name", "companyName", "organizationName"]) ?? companyName,
+        domain: normalizeCompanyDomainValue(readString(apiCompany, ["domain", "companyDomain", "primaryDomain", "website"])) ?? domain
+      },
+      people
+    };
   }
 
-  return "";
+  if (root && Array.isArray(people)) {
+    const apiCompany = asRecord(root.company);
+    return {
+      ...root,
+      company: {
+        ...(apiCompany ?? {}),
+        name: readString(apiCompany, ["name", "companyName", "organizationName"]) ?? companyName,
+        domain: normalizeCompanyDomainValue(readString(apiCompany, ["domain", "companyDomain", "primaryDomain", "website"])) ?? domain
+      },
+      people
+    };
+  }
+
+  return input;
+}
+
+function asRecord(value: unknown): UnknownRecord | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as UnknownRecord) : undefined;
+}
+
+function splitName(fullName: string): { firstName?: string; lastName?: string } {
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0],
+    lastName: parts.length > 1 ? parts.slice(1).join(" ") : undefined
+  };
+}
+
+function normalizeDomain(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return value
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/^@/, "")
+    .split("/")[0]
+    .trim();
+}
+
+function normalizeCompanyDomainValue(value: string | undefined): string | undefined {
+  const normalized = normalizeDomain(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  return normalized.includes(".") ? normalized : `${normalized}.com`;
+}
+
+function normalizeCompanyDomainHint(value: string): string {
+  return normalizeCompanyDomainValue(value) ?? value.trim().toLowerCase();
+}
+
+function titleCaseDomainLabel(value: string): string {
+  const label = (normalizeDomain(value) ?? value)
+    .split(".")[0]
+    .replace(/[-_]+/g, " ")
+    .trim();
+  return label
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function domainsMatch(actual: string | undefined, expected: string | undefined): boolean {
+  const normalizedActual = normalizeDomain(actual);
+  const normalizedExpected = normalizeDomain(expected);
+  return Boolean(
+    normalizedActual &&
+      normalizedExpected &&
+      (normalizedActual === normalizedExpected || normalizedActual.endsWith(`.${normalizedExpected}`))
+  );
+}
+
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function compareOptionalNumber(a: number | undefined, b: number | undefined): number {
+  if (a === undefined && b === undefined) {
+    return 0;
+  }
+  if (a === undefined) {
+    return 1;
+  }
+  if (b === undefined) {
+    return -1;
+  }
+  return a - b;
 }
 
 function clampScore(value: number): number {
@@ -794,44 +1262,8 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function byOrgPosition(a: Person, b: Person): number {
-  return a.level - b.level || a.id.localeCompare(b.id);
-}
-
-function extractResponseText(response: OpenAIResponse): string {
-  if (response.output_text) {
-    return response.output_text;
-  }
-
-  const text = response.output
-    ?.flatMap((item) => item.content ?? [])
-    .map((content) => content.text ?? "")
-    .join("")
-    .trim();
-
-  if (!text) {
-    const status = response.status ? `status=${response.status}` : "status=unknown";
-    const reason = response.incomplete_details?.reason ? `, reason=${response.incomplete_details.reason}` : "";
-    const outputTypes = response.output?.map((item) => item.type ?? "unknown").join(", ") ?? "none";
-    throw new Error(`OpenAI response did not contain text output (${status}${reason}, outputTypes=${outputTypes}).`);
-  }
-
-  return text;
-}
-
-function parseJsonObject(text: string): unknown {
-  const trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    const start = trimmed.indexOf("{");
-    const end = trimmed.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) {
-      throw new Error("GPT response was not valid JSON.");
-    }
-
-    return JSON.parse(trimmed.slice(start, end + 1));
-  }
+function normalizeForCompare(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function getEnvValue(name: string): string | undefined {
@@ -860,9 +1292,15 @@ function getEnvValue(name: string): string | undefined {
   return undefined;
 }
 
-function parseCliArgs(argv: string[]): CliArgs {
+function parseCliArgs(argv: string[]): {
+  inputPath: string;
+  outputPath: string;
+  domain?: string;
+  context: ContactContext;
+  topN?: number;
+  candidateLimit?: number;
+} {
   const args = new Map<string, string>();
-
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     const value = argv[index + 1];
@@ -874,29 +1312,129 @@ function parseCliArgs(argv: string[]): CliArgs {
     index += 1;
   }
 
+  const inputPath = args.get("input") ?? "coinbase-org-context.json";
+  const domain = args.get("domain");
+  const topN = args.has("top") ? Number(args.get("top")) : undefined;
+  const candidateLimit = args.has("candidateLimit") ? Number(args.get("candidateLimit")) : undefined;
+
   return {
-    orgPath: args.get("org") ?? "example.json",
-    productContext: {
-      sellerCompany: args.get("sellerCompany") ?? "Vercel",
-      targetCompany: args.get("targetCompany") ?? "NVIDIA",
-      productCategory: args.get("productCategory") ?? "frontend hosting/deployment",
-      competitor: args.get("competitor") ?? "Cloudflare"
-    },
-    options: {
-      model: args.get("model")
+    inputPath,
+    outputPath: args.get("output") ?? (domain ? `${domain}-selected-contacts-with-emails.json` : getDefaultOutputPath(inputPath)),
+    domain,
+    topN: Number.isFinite(topN) ? topN : undefined,
+    candidateLimit: Number.isFinite(candidateLimit) ? candidateLimit : undefined,
+    context: {
+      sellerCompany: args.get("sellerCompany"),
+      targetCompany: args.get("targetCompany"),
+      productCategory: args.get("productCategory"),
+      competitor: args.get("competitor")
     }
   };
+}
+
+function getPeopleArray(input: unknown): unknown[] | undefined {
+  const root = asRecord(input);
+  if (Array.isArray(root?.people)) {
+    return root.people;
+  }
+
+  const data = asRecord(root?.data);
+  if (Array.isArray(data?.people)) {
+    return data.people;
+  }
+
+  return Array.isArray(input) ? input : undefined;
+}
+
+function getCompanyRecord(root: UnknownRecord | undefined, selectedContacts: SelectedContact[]): UnknownRecord {
+  const data = asRecord(root?.data);
+  const company = asRecord(root?.company) ?? asRecord(data?.company);
+  if (company) {
+    return structuredCloneJson(company) as UnknownRecord;
+  }
+
+  const firstContact = selectedContacts[0];
+  return {
+    name: firstContact?.companyName ?? "Unknown company",
+    domain: firstContact?.companyDomain
+  };
+}
+
+function createPersonRecordFromContact(contact: SelectedContact): UnknownRecord {
+  return {
+    inputId: contact.inputId,
+    name: contact.fullName,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    title: contact.title,
+    department: contact.department,
+    companyName: contact.companyName,
+    companyDomain: contact.companyDomain,
+    linkedinUrl: contact.linkedinUrl
+  };
+}
+
+function findInputPersonIndex(people: unknown[], inputId: string | undefined): number {
+  const numericIndex = inputId !== undefined ? Number(inputId) : Number.NaN;
+  if (Number.isInteger(numericIndex) && numericIndex >= 0 && numericIndex < people.length) {
+    return numericIndex;
+  }
+
+  return people.findIndex((person) => {
+    const record = asRecord(person);
+    if (!record) {
+      return false;
+    }
+
+    const id = readString(record, ["inputId", "id", "personId"]);
+    return id !== undefined && id === inputId;
+  });
+}
+
+function structuredCloneJson(input: unknown): unknown {
+  return JSON.parse(JSON.stringify(input)) as unknown;
+}
+
+function getDefaultOutputPath(inputPath: string): string {
+  const directory = dirname(inputPath);
+  const extension = extname(inputPath) || ".json";
+  const name = basename(inputPath, extname(inputPath));
+  return join(directory, `${name}-with-emails${extension}`);
 }
 
 const isCliRun = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
 if (isCliRun) {
-  const { orgPath, productContext, options } = parseCliArgs(process.argv.slice(2));
-  const result = await runStakeholderAgent({
-    orgChart: orgPath,
-    productContext,
-    options
-  });
-
-  console.log(JSON.stringify(result, null, 2));
+  const { inputPath, outputPath, domain, context, topN, candidateLimit } = parseCliArgs(process.argv.slice(2));
+  const input = domain ? await loadPeopleInputFromApi(domain) : loadPeopleInput(inputPath);
+  const inputRoot = asRecord(input);
+  const company = asRecord(inputRoot?.company) ?? asRecord(asRecord(inputRoot?.data)?.company);
+  const result = await runContactAgent(
+    input,
+    {
+      ...context,
+      targetCompany: context.targetCompany ?? readString(company, ["name"])
+    },
+    {
+      topN,
+      candidateLimit
+    }
+  );
+  writeFileSync(resolve(outputPath), `${JSON.stringify(result.enrichedJson, null, 2)}\n`);
+  console.log(
+    JSON.stringify(
+      {
+        outputPath,
+        selectedContacts: result.selectedContacts.map((contact) => ({
+          name: contact.fullName,
+          title: contact.title,
+          contactScore: contact.contactScore
+        })),
+        emailSummary: result.emailLookup.summary,
+        trace: result.trace
+      },
+      null,
+      2
+    )
+  );
 }
